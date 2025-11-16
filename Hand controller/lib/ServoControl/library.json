@@ -1,0 +1,18 @@
+{
+  "name": "ServoControl",
+  "version": "1.0.0",
+  "description": "Servo control library for Starship Rocket project",
+  "keywords": "servo, control, rocket",
+  "authors": {
+    "name": "Starship Rocket Team"
+  },
+  "repository": {
+    "type": "git",
+    "url": ""
+  },
+  "frameworks": "arduino",
+  "platforms": "*",
+  "dependencies": {
+    "Servo": "*"
+  }
+}
