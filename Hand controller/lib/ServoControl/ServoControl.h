@@ -15,10 +15,10 @@ extern volatile uint32_t Servo4ControlPWM;
 #define SERVO3_PIN 3
 #define SERVO4_PIN 22
 
-#define SERVO1_HOME_DEG 60
-#define SERVO2_HOME_DEG 60
-#define SERVO3_HOME_DEG 60
-#define SERVO4_HOME_DEG 60
+#define SERVO1_HOME_DEG 65
+#define SERVO2_HOME_DEG 63
+#define SERVO3_HOME_DEG 54
+#define SERVO4_HOME_DEG 64
 
 #define SERVO_MAX_ANGLE 60
 #define SERVO_MIN_ANGLE -60

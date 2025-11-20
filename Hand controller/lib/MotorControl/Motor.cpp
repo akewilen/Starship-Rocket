@@ -14,7 +14,7 @@ void Motor_SetSpeed(int8_t speed)
   int motor_speed = int(constrain(speed, Speed_Min, Speed_Max));
 
 
-  // Map speed percentage to servo write values (1050-1940 degrees)
+  // Map speed percentage to servo write values (1100-1940 degrees)
   int motor1_write = map(motor_speed, 0, 100, 1100, 1940);
   int motor2_write = map(motor_speed, 0, 100, 1100, 1940);
   
