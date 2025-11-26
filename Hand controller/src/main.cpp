@@ -4,6 +4,8 @@
 #include <Servo.h>
 #include <HandController.h>
 #include <SDCardLoggin.h>
+#include <IMU.h>
+#include <Wire.h>
 
 #define SERIAL_BAUD_RATE 9600
 
@@ -12,6 +14,16 @@ uint8_t pithch;
 uint8_t yaw;  
 uint8_t roll;
 uint8_t killSwitchValue;
+
+// IMU raw values (int16_t from sensors)
+int16_t ax_raw, ay_raw, az_raw;
+int16_t gx_raw, gy_raw, gz_raw;
+int16_t mx_raw, my_raw, mz_raw;
+
+// IMU scaled values for display
+float ax_ms2, ay_ms2, az_ms2;
+float gx_dps, gy_dps, gz_dps;
+float mx, my, mz;
 
 // Global variables for system state
 volatile bool emergencyStop = false;
@@ -147,6 +159,11 @@ void setup() {
   // Run Servo Control Test
   Serial.println("Running Servo Control Test...");
   ServoControlTest();
+
+  // Initialize IMU
+  Serial.println("Initializing IMU...");
+  IMU_Init();
+  Serial.println("IMU initialized");
  
 }
 
@@ -161,6 +178,14 @@ void loop() {
   
   // Read all inputs including killswitch
   handController.readInputs();
+  
+  // Read IMU data (raw int16_t values)
+  IMU_Read(ax_ms2, ay_ms2, az_ms2, gx_dps, gy_dps, gz_dps, mx_raw, my_raw, mz_raw);
+  
+  // Magnetometer values - convert to float for consistency
+  mx = (float)mx_raw;
+  my = (float)my_raw;
+  mz = (float)mz_raw;
   
   // Check killswitch - if under center (127), activate emergency stop
   if (killSwitchValue < 127) {
@@ -204,17 +229,22 @@ void loop() {
   unsigned long currentTime = millis();
   if (sdLogger.isReady() && (currentTime - lastLogTime >= LOG_INTERVAL)) {
     // Log with timestamp relative to loop start (flight time)
-    sdLogger.logDataWithCustomTime(currentTime - loopStartTime, throttle, pithch, yaw, roll, killSwitchValue, emergencyStop);
+    sdLogger.logDataWithCustomTime(currentTime - loopStartTime, throttle, pithch, yaw, roll, killSwitchValue, emergencyStop, ax_ms2, ay_ms2, az_ms2, gx_dps, gy_dps, gz_dps);
     lastLogTime = currentTime;
   }
   
   // Print debug info periodically
   if (currentTime - lastDebugTime >= DEBUG_INTERVAL) {
     float flightTime = (currentTime - loopStartTime) / 1000.0;
-    Serial.println("T:" + String(flightTime, 1) + "s PPM - T:" + String(throttle) + " R:" + String(roll) + " P:" + String(pithch) + " Y:" + String(yaw) + " K:" + String(killSwitchValue));
+    //Serial.println("T:" + String(flightTime, 1) + "s PPM[T:" + String(throttle) + " R:" + String(roll) + " P:" + String(pithch) + " Y:" + String(yaw) + " K:" + String(killSwitchValue));
+    Serial.println("T:" + String(flightTime, 1) + "s | IMU[AX:" + String(ax_ms2, 2) + " AY:" + String(ay_ms2, 2) + " AZ:" + String(az_ms2, 2) +
+                   " GX:" + String(gx_dps, 2) + " GY:" + String(gy_dps, 2) + " GZ:" + String(gz_dps, 2) +
+                   " MX:" + String(mx, 1) + " MY:" + String(my, 1) + " MZ:" + String(mz, 1) + "]");
     lastDebugTime = currentTime;
   }
+
   
-  delay(50);
+  
+  delay(10);
 }
 
