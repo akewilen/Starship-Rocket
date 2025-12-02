@@ -41,7 +41,7 @@ bias_acc = [0.0277; 0.7364; 0.1344]; % [m/s^2]
 cov_gyro_deg = [ 0.0052    0.0001    0;
                      0.0001    0.0063   -0.0001;
                      0         -0.0001   0.0050 ];
-cov_gyro_rad = cov_gyro_deg * (pi/180)^2;     % [rad^2/s^2]
+cov_gyro_rad = cov_gyro_deg * (pi/180);     % [rad/s]
 
 % --- Accelerometer measurement noise covariance (per sample) ---
 % Given some base covariance in (m/s^2)^2, scaled down
@@ -258,7 +258,7 @@ for k = 2:N
     euler_angles_bias(:,k)   = [roll_b; pitch_b; yaw_b];
 
     % % ---------- Madgewick Filter  ----------
-    q_mat_madgewick(:, k) = madgewick_filter( mag_in_plain,  acc_in_plain ,  gyro_in_plain, bias_gyro_calib,  q_mat_madgewick(:, k-1), dt);
+    q_mat_madgewick(:, k) = madgewick_filter( acc_in_plain ,  gyro_in_plain, bias_gyro_calib,  q_mat_madgewick(:, k-1), dt);
     [roll_madge, pitch_madge, yaw_madge] = Q_to_Euler(q_mat_madgewick(:, k));
     euler_angles_madgewick(:, k) = [roll_madge, pitch_madge, yaw_madge].';
 

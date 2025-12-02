@@ -1,6 +1,6 @@
-function q_next = madgewick_filter(mag_meas, acc_meas,  gyro_meas, gyro_error,  q, dt)
+function q_next = madgewick_filter(acc_meas,  gyro_meas, gyro_error,  q, dt)
 % =========== INPUTS ==============================
-
+%add mag_meas as input if magnetometer active
 % mag_meas: Magnetometer measurements [uT]
 % acc_meas: Accelerometer measurements [m/s^2]
 % gyro_meas: Gyroscope measurements [rad/s]. NOTE: RAW DATA IS [deg/s]
@@ -15,26 +15,26 @@ function q_next = madgewick_filter(mag_meas, acc_meas,  gyro_meas, gyro_error,  
 %Ensures column vector
 gyro_meas = gyro_meas(:);
 acc_meas = acc_meas(:);
-mag_meas = mag_meas(:);
+%mag_meas = mag_meas(:);
 
 
 acc_meas = acc_meas/norm(acc_meas); %Normalize accelerometer measurement
-mx = mag_meas(1); my = mag_meas(2); mz = mag_meas(3);
+%mx = mag_meas(1); my = mag_meas(2); mz = mag_meas(3);
 ax = acc_meas(1); ay = acc_meas(2); az = acc_meas(3);
 wx = gyro_meas(1); wy = gyro_meas(2); wz = gyro_meas(3);
-norm_mag_meas = [0; mag_meas/norm(mag_meas)]; %Normalize magnetometer measurement
+%norm_mag_meas = [0; mag_meas/norm(mag_meas)]; %Normalize magnetometer measurement
 
-q_conj = [q(1) -q(2) -q(3) -q(4)].'; %Calculate q*
-prod1 = quat_mul(q, norm_mag_meas);
+%q_conj = [q(1) -q(2) -q(3) -q(4)].'; %Calculate q*
+%prod1 = quat_mul(q, norm_mag_meas);
 
-h = quat_mul(prod1, q_conj);
+%h = quat_mul(prod1, q_conj);
 %h = q * norm_mag_meas * q_conj; % Measured direction of earths gravitation field. Is biased
 %TODO: fix quaternion multiplication
 
 
 
-b = [0 sqrt(h(2)^2 + h(3)^2) 0 h(4)];
-bx = b(2); bz = b(4);
+%b = [0 sqrt(h(2)^2 + h(3)^2) 0 h(4)];
+%bx = b(2); bz = b(4);
 qw = q(1); qx = q(2); qy = q(3); qz = q(4);
 
 
@@ -46,13 +46,13 @@ J_g = [-2*qy 2*qz -2*qw 2*qx;
     0  -4*qx -4*qy 0];
 
 
-F_b = [2*bx*(1/2 - qy^2 - qz^2) + 2*bz * (qx*qz - qw*qy) - mx;
-    2*bx*(qx*qy - qw*qz) + 2*bz*(qw*qx + qy*qz) - my;
-    2*bx*(qw*qy + qx*qz) + 2*bz*(1/2 - qx^2 - qy^2) - mz];
+%F_b = [2*bx*(1/2 - qy^2 - qz^2) + 2*bz * (qx*qz - qw*qy) - mx;
+%    2*bx*(qx*qy - qw*qz) + 2*bz*(qw*qx + qy*qz) - my;
+%    2*bx*(qw*qy + qx*qz) + 2*bz*(1/2 - qx^2 - qy^2) - mz];
 
-J_b = [-2*bz*qy 2*bz*qz -4*bx*qy - 2*bz*qw  -4*bx*qz + 2*bz*qx;
-    -2*bx*qz + 2*bz*qx 2*bx*qy + 2*bz*qw 2*bx*qx + 2*bz*qz -2*bx*qw + 2*bz*qy;
-    2*bx*qy 2*bx*qz- 4*bz*qx 2*bx*qw - 4*bz*qy 2*bx* qx];
+%J_b = [-2*bz*qy 2*bz*qz -4*bx*qy - 2*bz*qw  -4*bx*qz + 2*bz*qx;
+%    -2*bx*qz + 2*bz*qx 2*bx*qy + 2*bz*qw 2*bx*qx + 2*bz*qz -2*bx*qw + 2*bz*qy;
+%    2*bx*qy 2*bx*qz- 4*bz*qx 2*bx*qw - 4*bz*qy 2*bx* qx];
 
 % ============= Only include extended matrices if we have a
 %magnetometer measurement ====================================
