@@ -4,6 +4,12 @@
 #include "Quaternion.h"
 #include "EKF.h"   // put your EKF function + EKFResult struct here
 
+
+Eigen::Vector3d gyro_mean(-0.0123, -0.0026, 0.0058); // [rad/s]
+Eigen::Vector3d acc_mean(0.0378, 0.0013, 10.0035);
+
+
+
 int main()
 {
     // --- IMU test inputs ---
@@ -36,7 +42,7 @@ int main()
         0.0025, -0.0086, 0.1750;
     Ra = Ra_unscaled * 1e-3;
 
-
+    
     // --- timestep ---
     float T = 0.01f;                // 10 ms
 
