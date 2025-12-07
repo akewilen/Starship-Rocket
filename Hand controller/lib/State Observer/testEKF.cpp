@@ -5,8 +5,10 @@
 #include "EKF.h"   // put your EKF function + EKFResult struct here
 
 
-Eigen::Vector3d gyro_mean(-0.0123, -0.0026, 0.0058); // [rad/s]
+Eigen::Vector3d gyro_bias(-0.0123, -0.0026, -0.0058); // [rad/s]
 Eigen::Vector3d acc_mean(0.0378, 0.0013, 10.0035);
+Eigen::Vector3d expected_acc(0.0, 0.0, 9.82);
+Eigen::Vector3d acc_bias(0.0378, 0.0013, 0.1835);
 
 
 
@@ -28,12 +30,12 @@ int main()
     // --- Initial covariance ---
     Eigen::Matrix4d P0 = Eigen::Matrix4d::Identity() ;
 
-    // --- Process noise (gyro noise covariance) ---
+    // --- Process noise (gyro noise covariance for measurements in rad/s) ---
     Eigen::Matrix3d Rw, Rw_unscaled;
-    Rw_unscaled << 0.0056,    0.0004 ,   0.0001,
-                   0.0004,    0.0063 ,   0.0002,
-                   0.0001,    0.0002 ,   0.0047;
-    Rw = Rw_unscaled * M_PI/180; //Convert Rw to Rad/s
+    Rw_unscaled << 0.1695,    0.0121 ,   0.0024,
+                   0.0121,    0.1928 ,   0.0070,
+                   0.0024,    0.0070 ,   0.1443;
+    Rw = Rw_unscaled * 1e-5; 
 
     // --- Measurement noise (accelerometer noise covariance) ---
     Eigen::Matrix3d Ra, Ra_unscaled;

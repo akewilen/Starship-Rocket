@@ -41,7 +41,7 @@ bias_acc = [0.0277; 0.7364; 0.1344]; % [m/s^2]
 cov_gyro_deg = [ 0.0052    0.0001    0;
                      0.0001    0.0063   -0.0001;
                      0         -0.0001   0.0050 ];
-cov_gyro_rad = cov_gyro_deg * (pi/180);     % [rad/s]
+cov_gyro_rad = cov_gyro_deg * (pi/180)^2;     % [rad/s]
 
 % --- Accelerometer measurement noise covariance (per sample) ---
 % Given some base covariance in (m/s^2)^2, scaled down
@@ -89,10 +89,10 @@ omega_true(:,1) = deg2rad([2; 1; 0.5]);  % small initial rate
 
 for k = 2:N
     % Random walk in angular velocity
-    omega_true(:,k) = omega_true(:,k-1) + deg2rad(5 * dt) * randn(3,1);
+    omega_true(:,k) = omega_true(:,k-1) + deg2rad(30 * dt) * randn(3,1);
 
     % Optionally limit max rate
-    omega_true(:,k) = max(min(omega_true(:,k), deg2rad(50)), -deg2rad(50));
+    %omega_true(:,k) = max(min(omega_true(:,k), deg2rad(50)), -deg2rad(50));
 end
 
 % Integrate quaternion to get true attitude
@@ -150,7 +150,7 @@ acc_meas  = zeros(3,N);
 mag_meas  = ones(3,N); %Dont care about this currently
 for k = 1:N
     % Gyro: true omega + drifting bias + noise
-    gyro_meas(:,k) = omega_true(:,k) + b_true(:,k) +  mvnrnd(zeros(3,1), cov_gyro_rad, 1).';
+    gyro_meas(:,k) = omega_true(:,k) + b_true(:,k) + mvnrnd(zeros(3,1), cov_gyro_rad, 1).';
 
     % Accel: true gravity + bias + noise
     acc_meas(:,k)  = acc_true(:,k)   + bias_acc +  mvnrnd(zeros(3,1), cov_acc, 1).';

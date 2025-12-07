@@ -36,3 +36,6 @@ Eigen::Matrix4d Somega(const Eigen::Vector3d& w);
 
 // 4x3 S(q) matrix from a 4x1 quaternion vector
 Eigen::Matrix<double, 4, 3> Sq(const Eigen::Vector4d& q);
+
+// To get roll, pitch and yaw rates from angular velocity
+Eigen::Vector3d w_to_euler_rate(Eigen::Vector3d &w, Eigen::Vector3d &euler_angles);

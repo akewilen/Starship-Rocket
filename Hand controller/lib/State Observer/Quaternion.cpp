@@ -128,3 +128,19 @@ Eigen::Matrix<double, 4, 3> Sq_q(const Quaternion& q)
          -q2,  q1,  q0;
     return S;
 }
+
+Eigen::Vector3d w_to_euler_rate(Eigen::Vector3d &w, Eigen::Vector3d &euler_angles)
+{
+    Eigen::Matrix3d T;
+    Eigen::Vector3d euler_rates;
+    float roll = euler_angles[0];
+    float pitch = euler_angles[1];
+    T << 1, std::sin(roll) * std::tan(pitch), std::cos(roll)*std::tan(pitch), 
+         0, std::cos(roll), -std::sin(roll),
+         0, std::sin(roll)/std::cos(pitch), std::cos(roll)/std::cos(pitch);
+
+    euler_rates = T * w;
+
+    return euler_rates;
+  
+}

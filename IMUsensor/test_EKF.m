@@ -30,7 +30,7 @@ q0 = [1 0 0 0].';
 q0_bias = q0;
 
 sigma_b0 = deg2rad(5);  %5degree/s uncertainty intially in drift
-P0_prior = blkdiag(eye(4), eye(3)*sigma_b0);
+P0_prior = blkdiag(eye(4), eye(3)*sigma_b0^2);
 
 x_prior = [q0; zeros(3,1)];
 
@@ -38,17 +38,20 @@ Rw = [0.0052    0.0001    0.0000;
     0.0001    0.0063   -0.0001;
     0.0000   -0.0001    0.0050];
 
+Rw = Rw * (pi/180)^2;
+
 Ra = 1.0e-03 *[ 0.2831    0.0004   -0.0075;
     0.0004    0.3034   -0.0001;
    -0.0075   -0.0001    0.2125]; 
 
 %Rb and Rw is process noise Q matrix
-Rw = 1e-4*eye(3);
-%Rb = deg2rad(eye(3) * 0.01^2); %Gyro bias
-Rb = 1e-6 *eye(3) ;
+%Rw = 1e-4*eye(3);
+%Rb = deg2rad(eye(3) * 0.0117^2); %Gyro bias
+Rb = 1e-1 * (b_drift_rad^2 * dt) * eye(3); 
+%Rb = 1e-1*eye(3)
 
 
-Ra = Ra * 100;
+%Ra = Ra * 100;
 
 q_mat = zeros(4, N);
 q_mat_bias = zeros(4, N);
@@ -65,7 +68,7 @@ euler_angles_bias(:, 1) = Q_to_Euler(q0_bias);
 
 for k = 2:N
     [x_updated, P_updated, x_pred, P_pred] = EKF(gyro_corr(:, k), acc_corr(:, k), q0, P0, Rw, Ra, T);
-    [x_updated_bias, P_updated_bias, x_pred_bias, P_pred_bias] = EKF_with_bias(gyro, acc_corr(:, k), x_prior, P0_prior, Rw, Rb, Ra, T);
+    [x_updated_bias, P_updated_bias, x_pred_bias, P_pred_bias] = EKF_with_bias(deg2rad(gyro(:,k)), acc_corr(:, k), x_prior, P0_prior, Rw, Rb, Ra, T);
  
  
     q_mat(:, k) = x_updated;
@@ -89,7 +92,22 @@ euler_rad_bias = euler_angles_bias;
 euler_rad_unwrapped_bias = unwrap(euler_rad_bias.').';  
 euler_deg_bias = rad2deg(euler_rad_unwrapped_bias);
 
+%%
+acc_euler = zeros(3,N);
 
+for k = 1:N
+    ax = acc_corr(1,k);
+    ay = acc_corr(2,k);
+    az = acc_corr(3,k);
+
+    roll_acc  = atan2( ay,  az);                     % φ
+    pitch_acc = atan2(-ax, sqrt(ay^2 + az^2));       % θ
+    yaw_acc   = 0;  % or keep as NaN if you want to signal "unknown"
+
+    acc_euler(:,k) = [roll_acc; pitch_acc; yaw_acc];
+end
+
+acc_euler_deg = rad2deg(unwrap(acc_euler.').');
 
 
 %% Euler angle approximation from quaternion integration
@@ -114,7 +132,7 @@ q_hist(:,1) = q;
 integrated_euler_angles = zeros(3, N);
 integrated_euler_angles(:, 1) = Q_to_Euler(q);
 for k = 2:N
-    omega_k = deg2rad(gyro_corr(:,k));        % [wx; wy; wz] at time k
+    omega_k = gyro_corr(:,k);        % [wx; wy; wz] at time k
     q = quat_propagate(q, omega_k, dt);
     [roll, pitch, yaw] = Q_to_Euler(q);
     integrated_euler_angles(:, k) = [roll, pitch, yaw].';
@@ -158,29 +176,36 @@ legend("EKF", "Gyroscope")
 %%
 figure
 subplot(3,1,1);
-plot(sim_time, euler_deg(1,:))
+plot(sim_time, euler_deg(1,:), "LineWidth",1)
 hold on
-plot(sim_time, euler_deg_bias(1,:))
+plot(sim_time, euler_deg_bias(1,:), "LineWidth",1)
+hold on
+plot(sim_time, acc_euler_deg(1,:), "LineWidth",1)
 xlabel("Time [s]")
 ylabel("Roll [d]")
-legend("EKF", "EKF + bias estimation")
+legend("EKF", "EKF + bias estimation", "Roll from accelerometer")
 title('EKF vs EKF with bias');
+
 
 subplot(3,1,2);
 plot(sim_time, euler_deg(2,:))
 hold on
 plot(sim_time, euler_deg_bias(2,:))
+hold on
+plot(sim_time, acc_euler_deg(2,:), "LineWidth",1)
 xlabel("Time [s]")
 ylabel("Pitch [d]")
-legend("EKF", "EKF + bias estimation")
+legend("EKF", "EKF + bias estimation", "Pitch from accelerometer")
 title('EKF vs EKF with bias');
 
 subplot(3,1,3);
 plot(sim_time, euler_deg(3,:))
 hold on
 plot(sim_time, euler_deg_bias(3,:))
+hold on
+plot(sim_time, acc_euler_deg(3,:))
 xlabel("Time [s]")
 ylabel("Yaw [d]")
-legend("EKF", "EKF + bias estimation")
+legend("EKF", "EKF + bias estimation", "Yaw from accelerometer")
 title('EKF vs EKF with bias');
 
