@@ -51,14 +51,14 @@ bool SDCardLogger::init() {
     return true;
 }
 
-bool SDCardLogger::logData(uint8_t throttle, uint8_t pitch, uint8_t yaw, uint8_t roll,
+bool SDCardLogger::logData(uint8_t throttle, double roll, double pitch, double yaw,
                           uint8_t killSwitch, bool emergencyStop, 
                           float batteryVoltage, float temperature, float ax_ms2, float ay_ms2, float az_ms2,
                           float gx_dps, float gy_dps, float gz_dps) {
-    return logDataWithCustomTime(millis(), throttle, pitch, yaw, roll, killSwitch, emergencyStop, ax_ms2, ay_ms2, az_ms2, gx_dps, gy_dps, gz_dps);
+    return logDataWithCustomTime(millis(), throttle, roll, pitch, yaw, killSwitch, emergencyStop, ax_ms2, ay_ms2, az_ms2, gx_dps, gy_dps, gz_dps);
 }
 
-bool SDCardLogger::logDataWithCustomTime(unsigned long customTime, uint8_t throttle, uint8_t pitch, uint8_t yaw, uint8_t roll,
+bool SDCardLogger::logDataWithCustomTime(unsigned long customTime, uint8_t throttle, double roll, double pitch, double yaw,
                                         uint8_t killSwitch, bool emergencyStop,
                                         float ax_ms2, float ay_ms2, float az_ms2,
                                         float gx_dps, float gy_dps, float gz_dps) {
@@ -69,9 +69,9 @@ bool SDCardLogger::logDataWithCustomTime(unsigned long customTime, uint8_t throt
     // Create CSV row: timestamp,throttle,pitch,yaw,roll,killswitch,emergency,ax_ms2,ay_ms2,az_ms2,gx_dps,gy_dps,gz_dps
     String logEntry = String(customTime) + "," +
                      String(throttle) + "," +
+                     String(roll) + "," +
                      String(pitch) + "," +
                      String(yaw) + "," +
-                     String(roll) + "," +
                      String(killSwitch) + "," +
                      (emergencyStop ? "1" : "0") + "," +
                      String(ax_ms2, 5) + "," +
@@ -143,7 +143,7 @@ bool SDCardLogger::writeCSVHeader() {
     if (!logFile) return false;
     
     // Write CSV header with all columns
-    String header = "Timestamp,Throttle,Pitch,Yaw,Roll,KillSwitch,Emergency,Ax_ms2,Ay_ms2,Az_ms2,Gx_dps,Gy_dps,Gz_dps";
+    String header = "Timestamp,Throttle,Roll,Pitch,Yaw,KillSwitch,Emergency,Ax_ms2,Ay_ms2,Az_ms2,Gx_dps,Gy_dps,Gz_dps";
     logFile.println(header);
     
     // Write metadata comments

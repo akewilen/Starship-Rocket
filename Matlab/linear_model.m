@@ -1,8 +1,11 @@
-clc; clear all;
+clc;
 % Linearized rocket model around hover with height states
 % State x = [p; q; r; phi; theta; psi; vx; vy; vz; z]
 % Input u = [Fx; Fy; Fz; Mz]
 % Outputs (example): y = [phi; theta; r; z; zdot; Fz]
+
+rocket_model = importGeometry("simple_3d_rocket.stl");
+
 m = 3;
 Ix = 0.215;
 Iy = 0.226;

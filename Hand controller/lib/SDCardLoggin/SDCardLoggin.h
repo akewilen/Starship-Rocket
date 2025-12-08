@@ -18,14 +18,14 @@ public:
     bool init();
     
     // Log data entry with timestamp
-    bool logData(uint8_t throttle, uint8_t pitch, uint8_t yaw, uint8_t roll, 
+    bool logData(uint8_t throttle, double roll, double pitch, double yaw, 
                 uint8_t killSwitch, bool emergencyStop = false, 
                 float batteryVoltage = 0.0, float temperature = 0.0,
                 float ax_ms2 = 0.0, float ay_ms2 = 0.0, float az_ms2 = 0.0,
                 float gx_dps = 0.0, float gy_dps = 0.0, float gz_dps = 0.0);
     
     // Log data entry with custom timestamp
-    bool logDataWithCustomTime(unsigned long customTime, uint8_t throttle, uint8_t pitch, uint8_t yaw, uint8_t roll, 
+    bool logDataWithCustomTime(unsigned long customTime, uint8_t throttle, double roll, double pitch, double yaw, 
                               uint8_t killSwitch, bool emergencyStop, 
                               float ax_ms2, float ay_ms2, float az_ms2,
                               float gx_dps, float gy_dps, float gz_dps);

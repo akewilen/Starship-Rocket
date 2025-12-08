@@ -6,13 +6,13 @@
 #include <SDCardLoggin.h>
 #include <IMU.h>
 #include <Wire.h>
-
+#include <EKF.h>
 #define SERIAL_BAUD_RATE 9600
 
 uint8_t throttle;
-uint8_t pithch;
-uint8_t yaw;  
-uint8_t roll;
+uint8_t RefPitch;
+uint8_t RefYaw;  
+uint8_t RefRoll;
 uint8_t killSwitchValue;
 
 // IMU raw values (int16_t from sensors)
@@ -22,9 +22,13 @@ int16_t mx_raw, my_raw, mz_raw;
 
 // IMU scaled values for display
 float ax_ms2, ay_ms2, az_ms2;
-float gx_dps, gy_dps, gz_dps;
-float mx, my, mz;
+float gx_rps, gy_rps, gz_rps;
 
+Eigen::Vector3d Acc_Bias(0.0, 0.0, 0.0); // Ax, Ay, Az
+Eigen::Vector3d Gyro_Bias(0.0, 0.0, 0.0); // Gx, Gy, Gz
+Eigen::Vector3d Mag_Bias(0.0, 0.0, 0.0); // Mx, My, Mz
+
+double roll; double pitch; double yaw;
 // Global variables for system state
 volatile bool emergencyStop = false;
 HandController handController;
@@ -32,9 +36,19 @@ HandController handController;
 // Debug and logging variables
 unsigned long lastDebugTime = 0;
 unsigned long lastLogTime = 0;
+unsigned long lastControlTime = 0; // For 100Hz control loop
 unsigned long loopStartTime = 0;  // Timestamp zero point
-const unsigned long DEBUG_INTERVAL = 1000; // Print debug info every 1 second
+const unsigned long DEBUG_INTERVAL = 100; // Print debug info every 1 second
 const unsigned long LOG_INTERVAL = 100;    // Log data every 100ms (10 Hz)
+const unsigned long CONTROL_INTERVAL = 10; // Control loop every 10ms (100 Hz)
+
+Eigen::Matrix4d P0 = Eigen::Matrix4d::Identity();
+Eigen::Matrix3d Rw, Rw_unscaled;
+Eigen::Matrix3d Ra, Ra_unscaled;
+Eigen::Vector3d f = Eigen::Vector3d(0.0, 0.0, 0.0);
+Eigen::Vector4d x0 = Eigen::Vector4d(1, 0, 0, 0);
+
+
 
 // Function to process servo/motor commands from string input
 void processSerialCommand(String input) {
@@ -112,9 +126,9 @@ void processSerialCommand(String input) {
 void printPPMDebug() {
   Serial.println("=== System Debug Info ===");
   Serial.print("Throttle: "); Serial.print(throttle); Serial.print(" (0-255)");
-  Serial.print(" | Pitch: "); Serial.print(pithch); Serial.print(" (0-255)");
-  Serial.print(" | Yaw: "); Serial.print(yaw); Serial.print(" (0-255)");
-  Serial.print(" | Roll: "); Serial.print(roll); Serial.print(" (0-255)");
+  Serial.print(" | Pitch: "); Serial.print(RefPitch); Serial.print(" (0-255)");
+  Serial.print(" | Yaw: "); Serial.print(RefYaw); Serial.print(" (0-255)");
+  Serial.print(" | Roll: "); Serial.print(RefRoll); Serial.print(" (0-255)");
   Serial.print(" | KillSwitch: "); Serial.print(killSwitchValue); Serial.println(" (0-255)");
   Serial.println("SD Card Status: " + String(sdLogger.isReady() ? "READY" : "NOT READY"));
   if (sdLogger.isReady()) {
@@ -135,7 +149,7 @@ void setup() {
   
   // Initialize Hand Controller first
   Serial.println("Initializing Hand Controller...");
-  handController.attach(throttle, pithch, yaw, roll, killSwitchValue);
+  handController.attach(throttle, RefPitch, RefYaw, RefRoll, killSwitchValue);
   handController.init();
   Serial.println("Hand controller initialized with killswitch on pin 0");
 
@@ -163,7 +177,21 @@ void setup() {
   // Initialize IMU
   Serial.println("Initializing IMU...");
   IMU_Init();
+  Acc_Bias = IMU_ACC_BIAS_READ();
+  Gyro_Bias = IMU_GYRO_BIAS_READ();
+  Mag_Bias = IMU_MAG_BIAS_READ();
+
   Serial.println("IMU initialized");
+
+  Ra_unscaled << 0.2596, 0.0135, 0.0025,
+    0.0135, 0.2925, -0.0086,
+    0.0025, -0.0086, 0.1750;
+  Ra = Ra_unscaled * 1e-3;
+
+  Rw_unscaled << 0.1695,    0.0121 ,   0.0024,
+               0.0121,    0.1928 ,   0.0070,
+               0.0024,    0.0070 ,   0.1443;
+  Rw = Rw_unscaled * 1e-5;
  
 }
 
@@ -175,23 +203,76 @@ void loop() {
       sdLogger.logMessage("Flight started - Loop timestamp zero point set");
     }
   }
-  
-  // Read all inputs including killswitch
-  handController.readInputs();
-  
-  // Read IMU data (raw int16_t values)
-  IMU_Read(ax_ms2, ay_ms2, az_ms2, gx_dps, gy_dps, gz_dps, mx_raw, my_raw, mz_raw);
-  
-  // Magnetometer values - convert to float for consistency
-  mx = (float)mx_raw;
-  my = (float)my_raw;
-  mz = (float)mz_raw;
-  
-  // Check killswitch - if under center (127), activate emergency stop
-  if (killSwitchValue < 127) {
-    emergencyStop = true;
-  } else {
-    emergencyStop = false;
+
+  // 100Hz control loop - only run if 10ms has passed
+  unsigned long currentTime = millis();
+  if (currentTime - lastControlTime >= CONTROL_INTERVAL) {
+    lastControlTime = currentTime;
+
+
+
+
+
+
+
+
+
+
+
+
+    
+    IMU_Read(ax_ms2, ay_ms2, az_ms2, gx_rps, gy_rps, gz_rps, mx_raw, my_raw, mz_raw);
+    Eigen::Vector3d acc_input(ax_ms2 - Acc_Bias[0],
+                              ay_ms2 - Acc_Bias[1],
+                              az_ms2 - Acc_Bias[2]);
+
+    Eigen::Vector3d gyro_input(gx_rps - Gyro_Bias[0],
+                               gy_rps - Gyro_Bias[1],
+                               gz_rps - Gyro_Bias[2]);
+
+    EKFResult ekfResult = EKF(gyro_input, acc_input, x0, P0, Rw, Ra, CONTROL_INTERVAL / 1000.0, f);
+
+    Eigen::Vector4d x_updated = ekfResult.x_updated;
+    Eigen::Matrix4d P_updated = ekfResult.P_updated;
+
+    Quaternion x_q = Quaternion(x_updated[0], x_updated[1], x_updated[2], x_updated[3]);
+    x_q.Q_to_Euler(roll, pitch, yaw);
+
+    x0 = x_updated;
+    P0 = P_updated;
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    
+    // Read all inputs including killswitch
+    handController.readInputs();
+    // Map roll and pitch from 0-255 to -60 to 60 degrees
+    int mappedRefRoll = map(RefRoll, 0, 255, -10, 10);
+    int mappedRefPitch = map(RefPitch, 0, 255, -10, 10);
+
+    int mappedThrottle = map(throttle, 0, 255, 0, 100);
+    //Motor_SetSpeed(mappedThrottle);
+    
+    // Check killswitch - if under center (127), activate emergency stop
+    if (killSwitchValue < 127) {
+      emergencyStop = true;
+    } else {
+      emergencyStop = false;
+    }
   }
   
   // Emergency stop loop
@@ -226,25 +307,20 @@ void loop() {
   }
   
   // Log flight data continuously
-  unsigned long currentTime = millis();
   if (sdLogger.isReady() && (currentTime - lastLogTime >= LOG_INTERVAL)) {
     // Log with timestamp relative to loop start (flight time)
-    sdLogger.logDataWithCustomTime(currentTime - loopStartTime, throttle, pithch, yaw, roll, killSwitchValue, emergencyStop, ax_ms2, ay_ms2, az_ms2, gx_dps, gy_dps, gz_dps);
+    sdLogger.logDataWithCustomTime(currentTime - loopStartTime, throttle, roll, pitch, yaw, killSwitchValue, emergencyStop, ax_ms2, ay_ms2, az_ms2, gx_rps, gy_rps, gz_rps);
     lastLogTime = currentTime;
   }
   
   // Print debug info periodically
   if (currentTime - lastDebugTime >= DEBUG_INTERVAL) {
     float flightTime = (currentTime - loopStartTime) / 1000.0;
-    //Serial.println("T:" + String(flightTime, 1) + "s PPM[T:" + String(throttle) + " R:" + String(roll) + " P:" + String(pithch) + " Y:" + String(yaw) + " K:" + String(killSwitchValue));
-    Serial.println("T:" + String(flightTime, 1) + "s | IMU[AX:" + String(ax_ms2, 2) + " AY:" + String(ay_ms2, 2) + " AZ:" + String(az_ms2, 2) +
-                   " GX:" + String(gx_dps, 2) + " GY:" + String(gy_dps, 2) + " GZ:" + String(gz_dps, 2) +
-                   " MX:" + String(mx, 1) + " MY:" + String(my, 1) + " MZ:" + String(mz, 1) + "]");
+    Serial.println("T:" + String(throttle) + " R:" + String(roll) + " P:" + String(pitch) + " Y:" + String(yaw) + " K:" + String(killSwitchValue));
+    //Serial.println("T:" + String(flightTime, 1) + "s | IMU[AX:" + String(ax_ms2, 2) + " AY:" + String(ay_ms2, 2) + " AZ:" + String(az_ms2, 2) +
+    //               " GX:" + String(gx_dps, 2) + " GY:" + String(gy_dps, 2) + " GZ:" + String(gz_dps, 2) +
+    //               " MX:" + String(mx, 1) + " MY:" + String(my, 1) + " MZ:" + String(mz, 1) + "]");
     lastDebugTime = currentTime;
   }
-
-  
-  
-  delay(10);
 }
 

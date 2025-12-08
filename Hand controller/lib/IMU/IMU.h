@@ -1,8 +1,26 @@
 #ifndef IMU_H
 #define IMU_H
 
-#include <Arduino.h>
 #include <Wire.h>
+
+// Undefine Arduino macros that conflict with Eigen
+#ifdef B0
+#undef B0
+#endif
+#ifdef B1
+#undef B1
+#endif
+#ifdef B2
+#undef B2
+#endif
+#ifdef B3
+#undef B3
+#endif
+#ifdef F
+#undef F
+#endif
+
+#include <C:\Users\akewi\Desktop\Starship-Rocket\Hand controller\.pio\libdeps\teensy41\Eigen\Dense>
 
 #define IMU_PIN_SDA  18  // Teensy 4.1 default SDA pin
 #define IMU_PIN_SCL  19  // Teensy 4.1 default SCL pin
@@ -32,9 +50,7 @@
 static float pi = 3.14159265359;
 static float sensitivity = 131.0;
 // Calibration offsets (Bias of sensors, computed in matlab)
-static float ax_offset = 0.0408f, ay_offset = 0.3858f, az_offset = 0.15f;
-static float gx_offset = -0.5573f, gy_offset = -0.1036f, gz_offset =  -0.3663f;
-static float mx_offset = 83.3796, my_offset = 220.8556, mz_offset =  217.8227;
+
 //Unit conversions 
 static float deg2rad = pi / 180.0;
 static float rad2deg = 180.0 / pi;
@@ -52,5 +68,8 @@ void ScaleGyro(int16_t gx_raw, int16_t gy_raw, int16_t gz_raw,
 void ScaleAcc(int16_t ax_raw, int16_t ay_raw, int16_t az_raw,
               float &ax_ms2, float &ay_ms2, float &az_ms2);
 
+Eigen::Vector3d IMU_ACC_BIAS_READ();
+Eigen::Vector3d IMU_GYRO_BIAS_READ();
+Eigen::Vector3d IMU_MAG_BIAS_READ();
 
 #endif

@@ -1,7 +1,9 @@
 #include "IMU.h"
 #include <Wire.h>
 #include <Arduino.h>
-
+#include <math.h>
+#include <stdint.h>
+#include <C:\Users\akewi\Desktop\Starship-Rocket\Hand controller\.pio\libdeps\teensy41\Eigen\Dense>
 
 // ---------- ICM helpers ----------
 void icmWrite(uint8_t reg, uint8_t val) {
@@ -49,11 +51,11 @@ void akReadBytes(uint8_t reg, uint8_t *buf, uint8_t len) {
 }
 
 void ScaleGyro(int16_t gx_raw, int16_t gy_raw, int16_t gz_raw,
-               float &gx_dps, float &gy_dps, float &gz_dps)
+               float &gx_rps, float &gy_rps, float &gz_rps)
 {
-    gx_dps = (float)gx_raw / sensitivity;
-    gy_dps = (float)gy_raw / sensitivity;
-    gz_dps = (float)gz_raw / sensitivity;
+    gx_rps = (float)gx_raw / sensitivity * M_PI/180.0;
+    gy_rps = (float)gy_raw / sensitivity * M_PI/180.0;
+    gz_rps = (float)gz_raw / sensitivity * M_PI/180.0;
 }
 
 void ScaleAcc(int16_t ax_raw, int16_t ay_raw, int16_t az_raw,
@@ -118,7 +120,7 @@ void IMU_Init() {
   delay(100);
   icmSetSampleRate(100);
   Serial.println("IMU: ICM20600 configured");
-
+  
   // ----- AK09918 init -----
   Serial.println("IMU: Initializing AK09918...");
   // Soft reset
@@ -169,3 +171,94 @@ void IMU_Read(float &ax_ms2, float &ay_ms2, float &az_ms2,
     }
 }
 
+Eigen::Vector3d IMU_ACC_BIAS_READ() {
+  const int num_readings = 300;
+  const int reading_delay_ms = 10; // 100Hz
+
+  Eigen::Vector3d acc_sum(0.0, 0.0, 0.0);
+  Eigen::Vector3d expected_acc(0.0, 0.0, 9.82);
+  for (int i = 0; i < num_readings; ++i) {
+    // Temporary variables to hold the readings for each loop
+    int16_t mx_r, my_r, mz_r;
+    float ax_m, ay_m, az_m, gx_d, gy_d, gz_d;
+
+    IMU_Read(ax_m, ay_m, az_m, gx_d, gy_d, gz_d, mx_r, my_r, mz_r);
+    
+    acc_sum[0] += ax_m;
+    acc_sum[1] += ay_m;
+    acc_sum[2] += az_m;
+    
+    delay(reading_delay_ms);
+  }
+
+  acc_sum = acc_sum / num_readings;
+
+  Serial.print("Accelerometer Bias (m/s^2): ");
+  Serial.print("Ax: "); Serial.print(acc_sum[0], 4);
+  Serial.print(" | Ay: "); Serial.print(acc_sum[1], 4);
+  Serial.print(" | Az: "); Serial.println(acc_sum[2], 4);
+
+  acc_sum = acc_sum - expected_acc;
+
+  return acc_sum;
+}
+
+Eigen::Vector3d IMU_GYRO_BIAS_READ() {
+  const int num_readings = 300;
+  const int reading_delay_ms = 10; // 100Hz
+
+  Eigen::Vector3d gyro_sum(0.0, 0.0, 0.0);
+  for (int i = 0; i < num_readings; ++i) {
+    // Temporary variables to hold the readings for each loop
+    int16_t mx_r, my_r, mz_r;
+    float ax_m, ay_m, az_m, gx_d, gy_d, gz_d;
+
+    IMU_Read(ax_m, ay_m, az_m, gx_d, gy_d, gz_d, mx_r, my_r, mz_r);
+    
+    gyro_sum[0] += gx_d;
+    gyro_sum[1] += gy_d;
+    gyro_sum[2] += gz_d;
+    
+    delay(reading_delay_ms);
+  }
+
+  gyro_sum = gyro_sum / num_readings;
+
+  gyro_sum = gyro_sum * (M_PI / 180.0); // Convert to radians per second
+
+  Serial.print("Gyroscope Bias (rad/s): ");
+  Serial.print("Gx: "); Serial.print(gyro_sum[0], 4);
+  Serial.print(" | Gy: "); Serial.print(gyro_sum[1], 4);
+  Serial.print(" | Gz: "); Serial.println(gyro_sum[2], 4);
+
+  return gyro_sum;
+}
+
+Eigen::Vector3d IMU_MAG_BIAS_READ() {
+  const int num_readings = 300;
+  const int reading_delay_ms = 10; // 100Hz
+
+  Eigen::Vector3d mag_sum(0.0, 0.0, 0.0);
+  for (int i = 0; i < num_readings; ++i) {
+    // Temporary variables to hold the readings for each loop
+    int16_t mx_r, my_r, mz_r;
+    float ax_m, ay_m, az_m, gx_d, gy_d, gz_d;
+
+    IMU_Read(ax_m, ay_m, az_m, gx_d, gy_d, gz_d, mx_r, my_r, mz_r);
+    
+    mag_sum[0] += mx_r;
+    mag_sum[1] += my_r;
+    mag_sum[2] += mz_r;
+    
+    delay(reading_delay_ms);
+  }
+
+  mag_sum = mag_sum / num_readings;
+
+  Serial.print("Magnetometer Bias (raw): ");
+  Serial.print("Mx: "); Serial.print(mag_sum[0], 4);
+  Serial.print(" | My: "); Serial.print(mag_sum[1], 4);
+  Serial.print(" | Mz: "); Serial.println(mag_sum[2], 4);
+
+  return mag_sum;
+}

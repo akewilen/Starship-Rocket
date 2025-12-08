@@ -1,5 +1,5 @@
 #pragma once
-#include <Eigen/Dense>
+#include <C:\Users\akewi\Desktop\Starship-Rocket\Hand controller\.pio\libdeps\teensy41\Eigen\Dense>
 
 class Quaternion {
 public:
@@ -24,7 +24,7 @@ public:
     }
 
     static Quaternion double_to_q(const Eigen::Vector4d &vec) {
-        return Quaternion(vec[0], vec[1], vec[2], vec[3]);
+        return Quaternion(vec(0), vec(1), vec(2), vec(3));
     }
 };
 
