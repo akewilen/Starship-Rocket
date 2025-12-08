@@ -8,7 +8,7 @@ Eigen::Matrix<double, 3, 4> Acc_measurement_model(
     const Eigen::Vector3d& f)
  {
     double qw = x.qw; double qx = x.qx; double qy = x.qy; double qz = x.qz ; //State prediction (quaternion)
-    double acc_mean_x = acc_mean[0]; double acc_mean_y = acc_mean[1]; double acc_mean_z = acc_mean[2];   //Mean of accelerometer data when IMU stationary
+    double acc_mean_x = acc_mean(0); double acc_mean_y = acc_mean(1); double acc_mean_z = acc_mean(2);   //Mean of accelerometer data when IMU stationary
     double fx = f[0]; double fy = f[1]; double fz = f[2]; //Linear accleration
 
     Eigen::Matrix<double, 3, 4> H;
@@ -80,8 +80,8 @@ EKFResult EKF(Eigen::Vector3d w,
 
     Eigen::Matrix <double, 4, 3> G = T/2.0 * Sq(x_pred_vec);
     P_pred = F * P * F.transpose() + G * Rw * G.transpose();
-    Eigen::Vector3d acc_mean;
-    acc_mean[0] = 0.0378; acc_mean[1] = 0.0013; acc_mean[2] = 10.0035; //Stationary Accelerometer mean reading for rocket
+    Eigen::Vector3d acc_mean(0.0, 0.0, 9.82);   //Can calculate this in setup and have as argument instead (acc_mean - acc_bias)
+   
 
     Eigen::Matrix <double, 3,4> H = Acc_measurement_model(x_pred, acc_mean, f); //Linearized measurement model
 

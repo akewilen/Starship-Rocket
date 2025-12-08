@@ -21,7 +21,7 @@ function [x_updated, P_updated, x_pred, P_pred] = EKF(w, a, x, P, Rw ,Ra, T,  f)
      f = [0; 0; 0] ; % Force acting on CM resulting in acceleration
  end
 
- g= [0.0131; -0.3506 ;9.8356]; %Mean of accelerometer data when IMU stationary
+ g= [0.0; 0.0 ;9.82]; %Mean of accelerometer data when IMU stationary
  
 
  H = Acc_measurment_model(x_pred, g, f); %Linearized accelerometer measurement model

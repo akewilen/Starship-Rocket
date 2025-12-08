@@ -1,4 +1,5 @@
 filename = "FLIGHT.csv";
+filename = "FLIGHT_FirstTest.csv";
 %filename = "IMUdata.csv";
 %filename = "more_data.csv";
 data = readtable(filename);
@@ -9,7 +10,22 @@ data = readtable(filename);
 acc = table2array(data(3:end, ["Var8" "Var9" "Var10"])).';
 gyro = table2array(data(3:end, ["Var11" "Var12" "Var13"])).';
 gyro = deg2rad(gyro);
+N = size(gyro, 2);
 acc_mean = mean(acc, 2);
 gyro_mean = mean(gyro, 2);
 
-cov_acc = (acc - acc_mean)
+bias_acc = acc_mean - [0;0;9.82];
+bias_gyro = gyro_mean;
+
+cov_acc = ((acc - acc_mean) * (acc - acc_mean).')/(N-1);
+cov_gyro = ((gyro - gyro_mean) * (gyro - gyro_mean).')/(N-1);
+
+mean(gyro - gyro_mean, 2);
+
+
+%%
+q0 = [1; 0; 0; 0];
+P = eye(4);
+for i = 1:size(data,1)
+    [x_updated, P_updated] = EKF(gyro - bias_gyro, acc - bias_acc, P, cov_gyro, cov_acc, 0.01, [0;0;0]);
+    

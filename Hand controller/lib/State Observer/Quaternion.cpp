@@ -17,7 +17,7 @@ void Quaternion::Q_to_Euler(double &roll, double &pitch, double &yaw) const {
 
     double sinp = std::sqrt(1 + 2 * (qw * qy - qx * qz));
     double cosp = std::sqrt(1 - 2 * (qw * qy - qx * qz));
-    pitch = -M_PI / 2 + 2 * std::atan2(sinp, cosp);
+    pitch = -0.5 * M_PI + 2 * std::atan2(sinp, cosp);
 
     double siny = 2 * (qw * qz + qx * qy);
     double cosy = 1 - 2 * (qy * qy + qz * qz);
@@ -25,16 +25,15 @@ void Quaternion::Q_to_Euler(double &roll, double &pitch, double &yaw) const {
 }
 
 Eigen::Matrix3d Quaternion::Q_to_Rotation() const {
+    double q0 = qw, q1 = qx, q2 = qy, q3 = qz;
+
     Eigen::Matrix3d R;
-
-    double w = qw, x = qx, y = qy, z = qz;
-
-    R << 1 - 2*(y*y + z*z), 2*(x*y - w*z),     2*(x*z + w*y),
-         2*(x*y + w*z),     1 - 2*(x*x + z*z), 2*(y*z - w*x),
-         2*(x*z - w*y),     2*(y*z + w*x),     1 - 2*(x*x + y*y);
-
-    return R;
+    R << 2*(q0*q0 + q1*q1) - 1,   2*(q1*q2 - q0*q3),       2*(q1*q3 + q0*q2),
+         2*(q1*q2 + q0*q3),       2*(q0*q0 + q2*q2) - 1,   2*(q2*q3 - q0*q1),
+         2*(q1*q3 - q0*q2),       2*(q2*q3 + q0*q1),       2*(q0*q0 + q3*q3) - 1;
+    return R;    // body -> world
 }
+
 
 double Quaternion::norm() const {
     return std::sqrt(qw*qw + qx*qx + qy*qy + qz*qz);
