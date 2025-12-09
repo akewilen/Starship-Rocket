@@ -12,6 +12,7 @@ Iy = 0.226;
 Iz = 0.160;
 g = 9.82;
 h = 0.4;
+L = 0.4345; % lenght from rudder center to COM
 
 Imatrix = diag([Ix,Iy,Iz]);
 
@@ -26,12 +27,12 @@ Imatrix = diag([Ix,Iy,Iz]);
 % Rows 4-6: Kinematics (dot(phi)=p, dot(theta)=q, dot(psi)=r)
 
 A_att = [
-    0, 0, 0, 0, 0, 0;  % dot(p)
-    0, 0, 0, 0, 0, 0;  % dot(q)
-    0, 0, 0, 0, 0, 0;  % dot(r)
-    1, 0, 0, 0, 0, 0;  % dot(phi)
-    0, 1, 0, 0, 0, 0;  % dot(theta)
-    0, 0, 1, 0, 0, 0   % dot(psi)
+    0, 0, 0, ((m*g*L)/Ix), 0, 0;  % dot(p)
+    0, 0, 0, 0, ((m*g*L)/Iy), 0;  % dot(q)
+    0, 0, 0, 0, 0,            0;  % dot(r)
+    1, 0, 0, 0, 0,            0;  % dot(phi)
+    0, 1, 0, 0, 0,            0;  % dot(theta)
+    0, 0, 1, 0, 0,            0   % dot(psi)
 ];
 
 % B_att Matrix (6x3)
