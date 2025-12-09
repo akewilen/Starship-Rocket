@@ -1,5 +1,5 @@
 #pragma once
-#include <C:\Users\akewi\Desktop\Starship-Rocket\Hand controller\.pio\libdeps\teensy41\Eigen\Dense>
+#include <..\..\.pio\libdeps\teensy41\Eigen\Dense>
 
 class Quaternion {
 public:

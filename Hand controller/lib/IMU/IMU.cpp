@@ -154,9 +154,10 @@ void IMU_Read(float &ax_ms2, float &ay_ms2, float &az_ms2,
     gy = (int16_t)((buf[10] << 8) | buf[11]);
     gz = (int16_t)((buf[12] << 8) | buf[13]);
 
-    gx_dps = (float)gx / sensitivity;
-    gy_dps = (float)gy / sensitivity;
-    gz_dps = (float)gz / sensitivity;
+    // Return in rad/s and m/s^2
+    gx_dps = ((float)gx / sensitivity) * M_PI/180.0;
+    gy_dps = ((float)gy / sensitivity) * M_PI/180.0;
+    gz_dps = ((float)gz / sensitivity) * M_PI/180.0;
     
     ax_ms2 = (float)ax * gravity / ACC_SENS;
     ay_ms2 = (float)ay * gravity / ACC_SENS;
@@ -223,8 +224,6 @@ Eigen::Vector3d IMU_GYRO_BIAS_READ() {
   }
 
   gyro_sum = gyro_sum / num_readings;
-
-  gyro_sum = gyro_sum * (M_PI / 180.0); // Convert to radians per second
 
   Serial.print("Gyroscope Bias (rad/s): ");
   Serial.print("Gx: "); Serial.print(gyro_sum[0], 4);

@@ -1,6 +1,5 @@
 #include "Quaternion.h"
 #include <cmath>
-#include <stdexcept>  // for std::runtime_error
 
 // -------- Quaternion methods --------
 
@@ -13,15 +12,15 @@ Quaternion::Quaternion(double w_, double x_, double y_, double z_)
 void Quaternion::Q_to_Euler(double &roll, double &pitch, double &yaw) const {
     double sinr = 2 * (qw * qx + qy * qz);
     double cosr = 1 - 2 * (qx * qx + qy * qy);
-    roll = std::atan2(sinr, cosr);
+    roll = std::atan2(sinr, cosr)* 180.0 / M_PI;
 
     double sinp = std::sqrt(1 + 2 * (qw * qy - qx * qz));
     double cosp = std::sqrt(1 - 2 * (qw * qy - qx * qz));
-    pitch = -0.5 * M_PI + 2 * std::atan2(sinp, cosp);
+    pitch = (-0.5 * M_PI + 2 * std::atan2(sinp, cosp)) * 180.0 / M_PI;
 
     double siny = 2 * (qw * qz + qx * qy);
     double cosy = 1 - 2 * (qy * qy + qz * qz);
-    yaw = std::atan2(siny, cosy);
+    yaw = std::atan2(siny, cosy) * 180.0 / M_PI;
 }
 
 Eigen::Matrix3d Quaternion::Q_to_Rotation() const {
@@ -41,9 +40,6 @@ double Quaternion::norm() const {
 
 void Quaternion::normalize() {
     double n = norm();
-    if (n == 0.0) {
-        throw std::runtime_error("Cannot normalize zero quaternion");
-    }
     qw /= n;
     qx /= n;
     qy /= n;
@@ -56,9 +52,6 @@ Quaternion Quaternion::conjugate() const {
 
 Quaternion Quaternion::inverse() const {
     double n2 = norm() * norm();
-    if (n2 == 0.0) {
-        throw std::runtime_error("Cannot invert zero quaternion");
-    }
     Quaternion q_conj = conjugate();
     return Quaternion(
         q_conj.qw / n2,

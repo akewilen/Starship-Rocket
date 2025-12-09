@@ -1,5 +1,5 @@
 #include "Quaternion.h"
-#include <Eigen/Dense>
+#include <..\..\.pio\libdeps\teensy41\Eigen\Dense>
 #include <iostream>
 
 Eigen::Matrix<double, 3, 4> Acc_measurement_model(

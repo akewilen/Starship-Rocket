@@ -143,7 +143,7 @@ bool SDCardLogger::writeCSVHeader() {
     if (!logFile) return false;
     
     // Write CSV header with all columns
-    String header = "Timestamp,Throttle,Roll,Pitch,Yaw,KillSwitch,Emergency,Ax_ms2,Ay_ms2,Az_ms2,Gx_dps,Gy_dps,Gz_dps";
+    String header = "Timestamp,Throttle,Roll,Pitch,Yaw,KillSwitch,Emergency,Ax_ms2,Ay_ms2,Az_ms2,Gx_rps,Gy_rps,Gz_rps";
     logFile.println(header);
     
     // Write metadata comments
