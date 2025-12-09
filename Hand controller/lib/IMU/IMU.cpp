@@ -3,7 +3,7 @@
 #include <Arduino.h>
 #include <math.h>
 #include <stdint.h>
-#include <C:\Users\akewi\Desktop\Starship-Rocket\Hand controller\.pio\libdeps\teensy41\Eigen\Dense>
+#include <..\..\.pio\libdeps\teensy41\Eigen\Dense>
 
 // ---------- ICM helpers ----------
 void icmWrite(uint8_t reg, uint8_t val) {
