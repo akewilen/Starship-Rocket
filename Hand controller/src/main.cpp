@@ -6,8 +6,8 @@
 #include <SDCardLoggin.h>
 #include <IMU.h>
 #include <Wire.h>
-#include <EKF.h>
 #include <MadgwickAHRS.h>
+#include <Kgain.h>
 #define SERIAL_BAUD_RATE 9600
 
 uint8_t throttle;
@@ -25,12 +25,14 @@ int16_t mx_raw, my_raw, mz_raw;
 float ax_ms2, ay_ms2, az_ms2;
 float gx_rps, gy_rps, gz_rps;
 
+
+
 Eigen::Vector3d Acc_Bias(0.0, 0.0, 0.0); // Ax, Ay, Az
 Eigen::Vector3d Gyro_Bias(0.0, 0.0, 0.0); // Gx, Gy, Gz
 Eigen::Vector3d Mag_Bias(0.0, 0.0, 0.0); // Mx, My, Mz
 
 double roll; double pitch; double yaw;
-
+double ref_roll = 0; double ref_pitch = 0; double ref_yawRate = 0;
 
 // Global variables for system state
 volatile bool emergencyStop = false;
@@ -194,7 +196,7 @@ void setup() {
   Rw_unscaled << 0.1695,    0.0121 ,   0.0024,
                0.0121,    0.1928 ,   0.0070,
                0.0024,    0.0070 ,   0.1443;
-  Rw = Rw_unscaled;
+  Rw = Rw_unscaled * 1e-3;
  
 }
 
@@ -212,6 +214,15 @@ void loop() {
   if (currentTime - lastControlTime >= CONTROL_INTERVAL) {
     lastControlTime = currentTime;
 
+    // Check killswitch - if under center (127), activate emergency stop
+    if (killSwitchValue < 127) {
+      emergencyStop = true;
+    } else {
+      emergencyStop = false;
+    }
+
+
+    // --------- Read IMU & get attitude ---------
     IMU_Read(ax_ms2, ay_ms2, az_ms2, gx_rps, gy_rps, gz_rps, mx_raw, my_raw, mz_raw);
 
     Eigen::Vector3d acc_input(ax_ms2 - Acc_Bias[0],
@@ -222,45 +233,40 @@ void loop() {
                                gy_rps - Gyro_Bias[1],
                                gz_rps - Gyro_Bias[2]);
 
-    EKFResult ekfResult = EKF(gyro_input, acc_input, x0, P0, Rw, Ra, (CONTROL_INTERVAL / 1000.0), f);
-
-    Eigen::Vector4d x_updated = ekfResult.x_updated;
-    Eigen::Matrix4d P_updated = ekfResult.P_updated;
-
-    Quaternion x_q = Quaternion(x_updated[0], x_updated[1], x_updated[2], x_updated[3]);
-    x_q.Q_to_Euler(roll, pitch, yaw);
-
-    x0 = x_updated;
-    P0 = P_updated;
-
     filter.updateIMU(gyro_input[0] * 180 / M_PI, gyro_input[1] * 180 / M_PI, gyro_input[2] * 180 / M_PI,
                       acc_input[0], acc_input[1], acc_input[2]);
 
-    Serial.print("Madgwick Filter - Roll: "); Serial.print(filter.getRoll(), 2);
-    Serial.print(" Pitch: "); Serial.print(filter.getPitch(), 2);
-    Serial.print(" Yaw: "); Serial.print(filter.getYaw(), 2);
-    Serial.println();
+    roll = filter.getRoll();
+    pitch = filter.getPitch();
+    yaw = 180.0 - filter.getYaw();
+    // ---------------------------------------------
+
+    // ----------- Calculate K gain ----------------
+
+    double roll_err = (roll - ref_roll)*M_PI/180.0;
+    double pitch_err = (pitch - ref_pitch)*M_PI/180.0;
+    double yawRate_err = (gyro_input[2] - ref_yawRate)*M_PI/180.0;
+
+    //State feedback control with State vector [p q r phi_err theta_err psi]'
+    Eigen::Vector3d U_K = U_K_att(gyro_input[0], gyro_input[1], yawRate_err, roll_err, pitch_err, yaw);
+
+    Serial.print("U_K values: Mx, My, Mz = ");
+    Serial.print(U_K[0], 4); Serial.print(", ");
+    Serial.print(U_K[1], 4); Serial.print(", ");
+    Serial.print(U_K[2], 4); Serial.println();
+
+    // ---------------------------------------------
+
+    // ----------- Set servo and thrust ------------
+    //                TODO
+    // ---------------------------------------------
 
 
 
-    // Check killswitch - if under center (127), activate emergency stop
-    if (killSwitchValue < 127) {
-      emergencyStop = true;
-    } else {
-      emergencyStop = false;
-    }
 
   }
 
-//      // Read all inputs including killswitch
-//    handController.readInputs();
-//    // Map roll and pitch from 0-255 to -60 to 60 degrees
-//    int mappedRefRoll = map(RefRoll, 0, 255, -10, 10);
-//    int mappedRefPitch = map(RefPitch, 0, 255, -10, 10);
-//
-//    int mappedThrottle = map(throttle, 0, 255, 0, 100);
-//    //Motor_SetSpeed(mappedThrottle);
-//    
+//    handController.readInputs();  
   
 //Emergency stop loop
  while (emergencyStop) {

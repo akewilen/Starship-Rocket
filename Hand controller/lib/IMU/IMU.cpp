@@ -173,7 +173,7 @@ void IMU_Read(float &ax_ms2, float &ay_ms2, float &az_ms2,
 }
 
 Eigen::Vector3d IMU_ACC_BIAS_READ() {
-  const int num_readings = 300;
+  const int num_readings = 100;
   const int reading_delay_ms = 10; // 100Hz
 
   Eigen::Vector3d acc_sum(0.0, 0.0, 0.0);
@@ -205,7 +205,7 @@ Eigen::Vector3d IMU_ACC_BIAS_READ() {
 }
 
 Eigen::Vector3d IMU_GYRO_BIAS_READ() {
-  const int num_readings = 300;
+  const int num_readings = 100;
   const int reading_delay_ms = 10; // 100Hz
 
   Eigen::Vector3d gyro_sum(0.0, 0.0, 0.0);
@@ -234,7 +234,7 @@ Eigen::Vector3d IMU_GYRO_BIAS_READ() {
 }
 
 Eigen::Vector3d IMU_MAG_BIAS_READ() {
-  const int num_readings = 300;
+  const int num_readings = 100;
   const int reading_delay_ms = 10; // 100Hz
 
   Eigen::Vector3d mag_sum(0.0, 0.0, 0.0);

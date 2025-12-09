@@ -11,7 +11,7 @@ Ix = 0.215;
 Iy = 0.226;
 Iz = 0.160;
 g = 9.82;
-h = 0.4;
+h = 0.4345;
 L = 0.4345; % lenght from rudder center to COM
 
 Imatrix = diag([Ix,Iy,Iz]);
