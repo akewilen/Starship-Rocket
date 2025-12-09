@@ -20,7 +20,7 @@
 #undef F
 #endif
 
-#include <C:\Users\akewi\Desktop\Starship-Rocket\Hand controller\.pio\libdeps\teensy41\Eigen\Dense>
+#include <..\..\.pio\libdeps\teensy41\Eigen\Dense>
 
 #define IMU_PIN_SDA  18  // Teensy 4.1 default SDA pin
 #define IMU_PIN_SCL  19  // Teensy 4.1 default SCL pin
