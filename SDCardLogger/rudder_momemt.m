@@ -2,8 +2,9 @@
 % Plots rudder angle vs force and performs linear curve fitting
 % Data: rudder angle (degrees) vs force measurements
 
-clear; clc; close all;
 
+clear; clc; close all;
+h = 0.4345;
 % Data: [rudder_angle_deg, force_kg]
 % Negative angles produce positive forces, positive angles produce negative forces
 data_negative = [
@@ -38,7 +39,7 @@ force_kg = data(:, 2);      % kg
 
 % Convert kg to Newtons (1 kg = 9.81 N)
 g = 9.81; % acceleration due to gravity (m/s²)
-force_N = force_kg * g;
+force_N = force_kg * g* h;
 
 % Display the converted data
 fprintf('Rudder Angle vs Force Data:\n');
@@ -117,8 +118,8 @@ plot([45, 45], [min(force_N)-1, max(force_N)+1], 'b:', 'LineWidth', 1.5, 'Color'
 
 % Formatting
 xlabel('Rudder Angle (degrees)', 'FontSize', 12, 'FontWeight', 'bold');
-ylabel('Force (Newtons)', 'FontSize', 12, 'FontWeight', 'bold');
-title('Rudder Angle vs Force - Limited Linear (-45° to 45°) + Polynomial Fits', 'FontSize', 14, 'FontWeight', 'bold');
+ylabel('Moment (N/m)', 'FontSize', 12, 'FontWeight', 'bold');
+title('Rudder Angle vs Mx & My - Limited Linear (-45° to 45°) + Polynomial Fits', 'FontSize', 14, 'FontWeight', 'bold');
 grid on;
 
 % Create legend

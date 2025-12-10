@@ -25,8 +25,6 @@ int16_t mx_raw, my_raw, mz_raw;
 float ax_ms2, ay_ms2, az_ms2;
 float gx_rps, gy_rps, gz_rps;
 
-
-
 Eigen::Vector3d Acc_Bias(0.0, 0.0, 0.0); // Ax, Ay, Az
 Eigen::Vector3d Gyro_Bias(0.0, 0.0, 0.0); // Gx, Gy, Gz
 Eigen::Vector3d Mag_Bias(0.0, 0.0, 0.0); // Mx, My, Mz
@@ -145,8 +143,6 @@ void printPPMDebug() {
   Serial.println("=========================");
 }
 
-
-
 void setup() {
   //initialize serial communication
   Serial.println("Initializing Serial Communication...");
@@ -221,7 +217,6 @@ void loop() {
       emergencyStop = false;
     }
 
-
     // --------- Read IMU & get attitude ---------
     IMU_Read(ax_ms2, ay_ms2, az_ms2, gx_rps, gy_rps, gz_rps, mx_raw, my_raw, mz_raw);
 
@@ -239,28 +234,17 @@ void loop() {
     roll = filter.getRoll();
     pitch = filter.getPitch();
     yaw = 180.0 - filter.getYaw();
-    // ---------------------------------------------
 
     // ----------- Calculate K gain ----------------
-
     double roll_err = (roll - ref_roll)*M_PI/180.0;
     double pitch_err = (pitch - ref_pitch)*M_PI/180.0;
     double yawRate_err = (gyro_input[2] - ref_yawRate)*M_PI/180.0;
 
-    //State feedback control with State vector [p q r phi_err theta_err psi]'
+    //State feedback control vector State vector [p q r phi_err theta_err psi]'
     Eigen::Vector3d U_K = U_K_att(gyro_input[0], gyro_input[1], yawRate_err, roll_err, pitch_err, yaw);
 
-    Serial.print("U_K values: Mx, My, Mz = ");
-    Serial.print(U_K[0], 4); Serial.print(", ");
-    Serial.print(U_K[1], 4); Serial.print(", ");
-    Serial.print(U_K[2], 4); Serial.println();
-
-    // ---------------------------------------------
-
     // ----------- Set servo and thrust ------------
-    //                TODO
-    // ---------------------------------------------
-
+    MapMomentsToServoAngles((double)U_K(0), (double)U_K(1), (double)U_K(2), throttle);
 
 
 

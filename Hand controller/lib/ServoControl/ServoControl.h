@@ -20,11 +20,14 @@ extern volatile uint32_t Servo4ControlPWM;
 #define SERVO3_HOME_DEG 63
 #define SERVO4_HOME_DEG 61
 
-#define SERVO_MAX_ANGLE 60
-#define SERVO_MIN_ANGLE -60
+#define SERVO_MAX_ANGLE 45
+#define SERVO_MIN_ANGLE -45
+
+#define MX_MY_SLOPE 24.3309f // 1/slope from Mx vs angle graph
 
 void ServoControl_SetAngle(int8_t angle1, int8_t angle2, int8_t angle3, int8_t angle4);
 void ServoControl_Init();
 void ServoControlTest();
+void MapMomentsToServoAngles(double Mx, double My, double Mz, uint8_t throttle);
 
 #endif
