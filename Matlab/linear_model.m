@@ -7,12 +7,13 @@ clc;
 rocket_model = importGeometry("simple_3d_rocket.stl");
 
 m = 3;
-Ix = 0.215;
-Iy = 0.226;
+Ix = 0.515;
+Iy = 0.515;
 Iz = 0.160;
 g = 9.82;
 h = 0.4345;
 L = 0.4345; % lenght from rudder center to COM
+Ts = 0.01;
 
 Imatrix = diag([Ix,Iy,Iz]);
 
@@ -56,43 +57,43 @@ D_att = zeros(6, 3);
 
 % Create the state-space object (Optional but recommended for analysis)
 sys_att = ss(A_att, B_att, C_att, D_att);
+sysd = c2d(sys_att, Ts);
 
 % --- AUGMENTATION FOR INTEGRAL ACTION on Yaw Rate (r) ---
 
 % C_I defines the error state for integration: dot(x_I) = 0*p + 0*q + (-1)*r + ...
-C_I = [0, 0, 1, 0, 0, 0]; % Yaw rate 'r' is the 3rd state
+C_I = [0, 0, 1, 0, 0, 0; % Yaw rate 'r' is the 3rd state
+       0, 0, 0, 1, 0, 0;
+       0, 0, 0, 0, 1, 0];
 
 % A_aug (7x7)
-A_aug = [A_att, zeros(6, 1);  % Top 6 rows
-        C_I,   0];             % Bottom row (Integral dynamics)
+A_aug = [A_att, zeros(6, 3);  % Top 6 rows
+        C_I,   zeros(3,3)];             % Bottom row (Integral dynamics)
 
 % B_aug (7x3)
 B_aug = [B_att;               % Top 6 rows
-        zeros(1, 3)];          % Bottom row (Input does not affect integral error derivative)
+        zeros(3, 3)];          % Bottom row (Input does not affect integral error derivative)
 
 
 % Q_att: [p, q, r, phi, theta, psi]
-Q_att_diag = diag([1, 1, 1000, 1000, 1000, 1]); 
+Q_att_diag = diag([5000, 5000, 500, 100000, 100000, 100]); 
 
 % Q_aug (7x7) - Add weight for the integral state (x_I)
 % High weight on Q_I forces the integral error to zero quickly.
-Q_I_weight = 100; % Tune this to control integral action aggressiveness
+Q_I_weight = diag([10001 100 100]); % Tune this to control integral action aggressiveness
 Q_aug = blkdiag(Q_att_diag, Q_I_weight);
 
 % R_att (3x3) - Input cost [Mx, My, Mz]
-R_att = diag([1, 1, 1]);
+R_att = 30*diag([1, 1, 1]);
 
 % --- COMPUTE LQI GAIN ---
-K_aug = lqr(A_aug, B_aug, Q_aug, R_att);
+%K_aug = lqr(A_aug, B_aug, Q_aug, R_att);
+K_aug = lqrd(A_aug, B_aug, Q_aug, R_att,Ts);
 
 % Separate the gains for implementation
-K_att = K_aug(:, 1:6);  % Standard state feedback gain
-K_I   = K_aug(:, 7);    % Integral gain
+K_att = K_aug(:, 1:6)  % Standard state feedback gain
+K_I   = K_aug(:, 7)    % Integral gain
 
-Q= diag([0.01,0.01,10,10,10,0.01]);
-R=eye(3);
-
-K = lqr(sys_att,Q,R);
 
 %-------------- Altitude control -----------------
 
@@ -125,7 +126,7 @@ C_alt = eye(2);
 D_alt = zeros(2, 1);
 
 % Create the state-space object
-sys_alt = ss(A_alt, B_alt, C_alt, D_alt);
+sys_alt = ss(A_alt, B_alt, C_alt, D_alt, Ts);
 
 
 % --- LQR Design Considerations for Altitude ---
@@ -139,7 +140,7 @@ Q_alt = diag([
 R_alt = 1; % Weight on input Fz_linearized
 
 % Compute LQR gain for altitude
-K_alt = lqr(A_alt, B_alt, Q_alt, R_alt);
+K_alt = lqrd(A_alt, B_alt, Q_alt, R_alt, Ts);
 
 disp('LQR Gain K_alt (1x2):');
 disp(K_alt);

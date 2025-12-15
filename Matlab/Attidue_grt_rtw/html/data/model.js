@@ -1,0 +1,1 @@
+var modelInfo = {model:"Attidue"};var modelHierarchy=[{model:"Attidue",relativePath:"_internal.html",parent:"null"},];var AddCode = true;var ProtectedModel = false;
