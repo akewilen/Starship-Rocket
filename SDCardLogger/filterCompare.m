@@ -5,7 +5,7 @@
 clear; clc; close all;
 
 % Read the CSV file
-filename = 'Flight_attitude_test.csv';
+filename = 'log.csv';
 data = readmatrix(filename);
 
 % Extract data columns

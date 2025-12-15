@@ -4,7 +4,7 @@ function SDcardLogger()
 % showing timestamp (in ms) vs various flight parameters
 
     % Read the CSV file
-    filename = 'FLIGHT_attitude_test.CSV';
+    filename = 'FLIGHT.CSV';
     
     % Check if file exists
     if ~exist(filename, 'file')
@@ -16,7 +16,7 @@ function SDcardLogger()
     opts.VariableNamingRule = 'preserve';
     
     % Set proper variable names since the header gets skipped due to comments
-    opts.VariableNames = {'Timestamp', 'Throttle', 'Roll', 'Pitch', 'Yaw', 'KillSwitch', 'Emergency'};
+    opts.VariableNames = {'Timestamp', 'Throttle', 'Pitch', 'Yaw', 'Roll', 'KillSwitch', 'Emergency'};
     
     % Read the data
     data = readtable(filename, opts);

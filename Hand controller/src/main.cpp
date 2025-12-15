@@ -110,11 +110,7 @@ void processSerialCommand(String input) {
         values[i] = constrain(values[i], SERVO_MIN_ANGLE, SERVO_MAX_ANGLE);
       }
       
-      ref_roll = values[0];
-      ref_pitch = values[1];
-      ref_yawRate = values[2];
-      throttle = values[3];
-      //ServoControl_SetAngle(values[0], values[1], values[2], values[3]);
+      ServoControl_SetAngle(values[0], values[1], values[2], values[3]);
       
       Serial.print("Servos set to: ");
       Serial.print(values[0]); Serial.print(", ");
@@ -174,7 +170,6 @@ void setup() {
   Serial.println("Initializing Motor...");
   Motor_Init();
   MotorCalibration();
-  throttle = 0;
 
   // Run Servo Control Test
   Serial.println("Running Servo Control Test...");
@@ -236,35 +231,9 @@ void loop() {
     filter.updateIMU(gyro_input[0] * 180 / M_PI, gyro_input[1] * 180 / M_PI, gyro_input[2] * 180 / M_PI,
                       acc_input[0], acc_input[1], acc_input[2]);
 
-    // Get raw angles from filter
-    double roll_raw = filter.getRoll();
-    double pitch_raw = filter.getPitch();
-    double yaw_raw = 180.0 - filter.getYaw();
-    
-    // Apply lowpass filter to roll, pitch, yaw
-    static double roll_filtered = 0.0;
-    static double pitch_filtered = 0.0;
-    static double yaw_filtered = 0.0;
-    static bool first_run = true;
-    
-    if (first_run) {
-        // Initialize filters with first values
-        roll_filtered = roll_raw;
-        pitch_filtered = pitch_raw;
-        yaw_filtered = yaw_raw;
-        first_run = false;
-    }
-    
-    // Lowpass filter coefficient (0 < alpha < 1, smaller = more filtering)
-    const double alpha = 0.1;
-    roll_filtered = alpha * roll_raw + (1.0 - alpha) * roll_filtered;
-    pitch_filtered = alpha * pitch_raw + (1.0 - alpha) * pitch_filtered;
-    yaw_filtered = alpha * yaw_raw + (1.0 - alpha) * yaw_filtered;
-    
-    // Update global variables with filtered values
-    roll = roll_filtered;
-    pitch = pitch_filtered;
-    yaw = yaw_filtered;
+    roll = filter.getRoll();
+    pitch = filter.getPitch();
+    yaw = 180.0 - filter.getYaw();
 
     // ----------- Calculate K gain ----------------
     double roll_err = (roll - ref_roll)*M_PI/180.0;
@@ -277,27 +246,16 @@ void loop() {
     // ----------- Set servo and thrust ------------
     MapMomentsToServoAngles((double)U_K(0), (double)U_K(1), (double)U_K(2), throttle);
 
-    Motor_SetSpeed(throttle);
+
 
   }
 
-  if (Serial.available() > 0) {
-    String input = Serial.readStringUntil('\n');
-    input.trim();
-    if (input == "debug") {
-      printPPMDebug();
-    } else if (input == "status") {
-      Serial.println("SYSTEM OPERATIONAL");
-      printPPMDebug();
-    } else {
-      processSerialCommand(input);
-    }
-  }
+//    handController.readInputs();  
   
 //Emergency stop loop
  while (emergencyStop) {
    // Set everything to safe state once
-   //ServoControl_SetAngle(0, 0, 0, 0);
+   ServoControl_SetAngle(0, 0, 0, 0);
    Motor_SetSpeed(0);
    Serial.println("*** EMERGENCY STOP ACTIVE - KillSwitch < 127 ***");
    
@@ -328,3 +286,4 @@ void loop() {
    lastDebugTime = currentTime;
  }
 }
+

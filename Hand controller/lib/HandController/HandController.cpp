@@ -2,6 +2,12 @@
 #include "HandController.h"
 #include "Arduino.h"
 
+// Static variable definitions
+volatile uint32_t HandController::pulseStart[5] = {0, 0, 0, 0, 0};
+volatile uint16_t HandController::pulseWidth[5] = {PPM_CENTER_PULSE, PPM_CENTER_PULSE, PPM_CENTER_PULSE, PPM_CENTER_PULSE, PPM_CENTER_PULSE};
+volatile uint32_t HandController::lastPulseTime[5] = {0, 0, 0, 0, 0};
+volatile bool HandController::pulseValid[5] = {false, false, false, false, false};
+
 void HandController::attach(uint8_t &throttleRef, uint8_t &pitchRef, uint8_t &yawRef, uint8_t &rollRef, uint8_t &killSwitchRef) {
     throttle = &throttleRef;
     pitch = &pitchRef;
@@ -17,44 +23,86 @@ void HandController::init() {
     pinMode(YAW_PIN, INPUT);
     pinMode(ROLL_PIN, INPUT);
     pinMode(KILL_SWITCH_PIN, INPUT);
+    
+    setupPulseReading();
 }
 
 void HandController::readInputs() {
-    // Read PPM pulses and convert to 0-255 range
+    uint32_t currentTime = millis();
+    
+    // Read PPM pulses and convert to 0-255 range (non-blocking)
     if (throttle) {
-        uint16_t pulse = readPPMPulse(THROTTLE_PIN);
+        uint16_t pulse = (currentTime - lastPulseTime[0] < PPM_TIMEOUT_MS && pulseValid[0]) ? pulseWidth[0] : PPM_CENTER_PULSE;
         *throttle = pulseToValue(pulse);
     }
     if (pitch) {
-        uint16_t pulse = readPPMPulse(PITCH_PIN);
+        uint16_t pulse = (currentTime - lastPulseTime[1] < PPM_TIMEOUT_MS && pulseValid[1]) ? pulseWidth[1] : PPM_CENTER_PULSE;
         *pitch = pulseToValue(pulse);
     }
     if (yaw) {
-        uint16_t pulse = readPPMPulse(YAW_PIN);
+        uint16_t pulse = (currentTime - lastPulseTime[2] < PPM_TIMEOUT_MS && pulseValid[2]) ? pulseWidth[2] : PPM_CENTER_PULSE;
         *yaw = pulseToValue(pulse);
     }
     if (roll) {
-        uint16_t pulse = readPPMPulse(ROLL_PIN);
+        uint16_t pulse = (currentTime - lastPulseTime[3] < PPM_TIMEOUT_MS && pulseValid[3]) ? pulseWidth[3] : PPM_CENTER_PULSE;
         *roll = pulseToValue(pulse);
     }
     if (killSwitch) {
-        uint16_t pulse = readPPMPulse(KILL_SWITCH_PIN);
+        uint16_t pulse = (currentTime - lastPulseTime[4] < PPM_TIMEOUT_MS && pulseValid[4]) ? pulseWidth[4] : PPM_CENTER_PULSE;
         *killSwitch = pulseToValue(pulse);
     }
 }
 
 
 
-// Read PPM pulse width from specified pin
-uint16_t HandController::readPPMPulse(uint8_t pin) {
-    uint16_t pulseWidth = pulseIn(pin, HIGH, PPM_TIMEOUT);
+void HandController::setupPulseReading() {
+    // Attach interrupts for each channel
+    attachInterrupt(digitalPinToInterrupt(THROTTLE_PIN), throttleISR, CHANGE);
+    attachInterrupt(digitalPinToInterrupt(PITCH_PIN), pitchISR, CHANGE);
+    attachInterrupt(digitalPinToInterrupt(YAW_PIN), yawISR, CHANGE);
+    attachInterrupt(digitalPinToInterrupt(ROLL_PIN), rollISR, CHANGE);
+    attachInterrupt(digitalPinToInterrupt(KILL_SWITCH_PIN), killSwitchISR, CHANGE);
+}
+
+void HandController::handlePulse(uint8_t channel, uint8_t pin) {
+    uint32_t currentTime = micros();
     
-    // If no pulse detected or invalid, return center value
-    if (pulseWidth == 0 || !isPulseValid(pulseWidth)) {
-        return PPM_CENTER_PULSE;
+    if (digitalRead(pin) == HIGH) {
+        // Rising edge - start timing
+        pulseStart[channel] = currentTime;
+    } else {
+        // Falling edge - calculate pulse width
+        if (pulseStart[channel] != 0) {
+            uint32_t width = currentTime - pulseStart[channel];
+            if (width >= PPM_MIN_PULSE - 100 && width <= PPM_MAX_PULSE + 100) {
+                pulseWidth[channel] = width;
+                lastPulseTime[channel] = millis();
+                pulseValid[channel] = true;
+            }
+            pulseStart[channel] = 0;
+        }
     }
-    
-    return pulseWidth;
+}
+
+// Interrupt service routines
+void HandController::throttleISR() {
+    handlePulse(0, THROTTLE_PIN);
+}
+
+void HandController::pitchISR() {
+    handlePulse(1, PITCH_PIN);
+}
+
+void HandController::yawISR() {
+    handlePulse(2, YAW_PIN);
+}
+
+void HandController::rollISR() {
+    handlePulse(3, ROLL_PIN);
+}
+
+void HandController::killSwitchISR() {
+    handlePulse(4, KILL_SWITCH_PIN);
 }
 
 // Convert PPM pulse width (1000-2000μs) to 0-255 value
