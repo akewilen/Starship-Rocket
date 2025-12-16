@@ -46,27 +46,20 @@
 #define AK09918_CONTINUOUS_50HZ 0x06
 #define AK09918_CONTINUOUS_100HZ 0x08
 
-//constants 
-static float pi = 3.14159265359;
-static float sensitivity = 131.0;
+#define SENSITIVITY 131.0f
 // Calibration offsets (Bias of sensors, computed in matlab)
 
 //Unit conversions 
-static float deg2rad = pi / 180.0;
-static float rad2deg = 180.0 / pi;
-static float ACC_SENS = 16384.0;   // LSB/g for ±2g
-static float gravity = 9.81;
+#define DEG2RAD (3.14159265359f / 180.0f)
+#define RAD2DEG (180.0f / 3.14159265359f)
+#define ACC_SENS 16384.0f   // LSB/g for ±2g
+#define GRAVITY 9.81f
 
 void IMU_Init();
 void IMU_Read(float &ax_ms2, float &ay_ms2, float &az_ms2,
               float &gx_dps, float &gy_dps, float &gz_dps,
               int16_t &mx, int16_t &my, int16_t &mz);
 
-// Helper functions for scaling
-void ScaleGyro(int16_t gx_raw, int16_t gy_raw, int16_t gz_raw,
-               float &gx_dps, float &gy_dps, float &gz_dps);
-void ScaleAcc(int16_t ax_raw, int16_t ay_raw, int16_t az_raw,
-              float &ax_ms2, float &ay_ms2, float &az_ms2);
 
 Eigen::Vector3d IMU_ACC_BIAS_READ();
 Eigen::Vector3d IMU_GYRO_BIAS_READ();

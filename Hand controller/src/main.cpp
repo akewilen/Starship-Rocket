@@ -32,11 +32,12 @@ Eigen::Vector3d Mag_Bias(0.0, 0.0, 0.0); // Mx, My, Mz
 double roll; double pitch; double yaw;
 double ref_roll = 0; double ref_pitch = 0; double ref_yawRate = 0;
 
-// Global variables for system state
-volatile bool emergencyStop = false;
 HandController handController;
 
-// Debug and logging variables
+// Global variables for system state
+volatile bool emergencyStop = false;
+volatile bool newDataReady = false;
+unsigned long currentTime = 0;
 unsigned long lastDebugTime = 0;
 unsigned long lastLogTime = 0;
 unsigned long lastControlTime = 0; // For 100Hz control loop
@@ -52,6 +53,81 @@ Eigen::Vector3d f = Eigen::Vector3d(0.0, 0.0, 0.0);
 Eigen::Vector4d x0 = Eigen::Vector4d(1, 0, 0, 0);
 
 Madgwick filter;
+
+IntervalTimer controlTimer;
+
+void controlLoopISR() {
+    // Check killswitch - if under center (127), activate emergency stop
+  if (killSwitchValue < 127) {
+    emergencyStop = true;
+  } else {
+    emergencyStop = false;
+  }
+
+  if(!emergencyStop){
+  // --------- Read IMU & get attitude ---------
+    IMU_Read(ax_ms2, ay_ms2, az_ms2, gx_rps, gy_rps, gz_rps, mx_raw, my_raw, mz_raw);
+    Eigen::Vector3d acc_input(ax_ms2 - Acc_Bias[0],
+                              ay_ms2 - Acc_Bias[1],
+                              az_ms2 - Acc_Bias[2]);
+    Eigen::Vector3d gyro_input(gx_rps - Gyro_Bias[0],
+                               gy_rps - Gyro_Bias[1],
+                               gz_rps - Gyro_Bias[2]);
+
+    filter.updateIMU(gyro_input[0] * 180 / M_PI, gyro_input[1] * 180 / M_PI, gyro_input[2] * 180 / M_PI,
+                      acc_input[0], acc_input[1], acc_input[2]);
+    // Get raw angles from filter
+    double roll_raw = filter.getRoll();
+    double pitch_raw = filter.getPitch();
+    double yaw_raw = 180.0 - filter.getYaw();
+    
+    // Apply lowpass filter to roll, pitch, yaw
+    static double roll_filtered = 0.0;
+    static double pitch_filtered = 0.0;
+    static double yaw_filtered = 0.0;
+    static bool first_run = true;
+    
+    if (first_run) {
+        // Initialize filters with first values
+        roll_filtered = roll_raw;
+        pitch_filtered = pitch_raw;
+        yaw_filtered = yaw_raw;
+        first_run = false;
+    }
+
+    // Lowpass filter coefficient (0 < alpha < 1, smaller = more filtering)
+    const double alpha = 0.1;
+    roll_filtered = alpha * roll_raw + (1.0 - alpha) * roll_filtered;
+    pitch_filtered = alpha * pitch_raw + (1.0 - alpha) * pitch_filtered;
+    yaw_filtered = alpha * yaw_raw + (1.0 - alpha) * yaw_filtered;
+
+    // Update global variables with filtered values
+    roll = roll_filtered;
+    pitch = pitch_filtered;
+    yaw = yaw_filtered;
+
+    Serial.print("Roll: "); Serial.print(roll, 2);
+    Serial.print(" | Pitch: "); Serial.print(pitch, 2); 
+    Serial.print(" | Yaw: "); Serial.println(yaw, 2);
+    
+    // ----------- Calculate K gain ----------------
+    double roll_err = (roll - ref_roll)*M_PI/180.0;
+    double pitch_err = (pitch - ref_pitch)*M_PI/180.0;
+    double yawRate_err = (gyro_input[2] - ref_yawRate)*M_PI/180.0;
+    //State feedback control vector State vector [p q r phi_err theta_err psi]'
+    Eigen::Vector3d U_K = U_K_att(gyro_input[0], gyro_input[1], yawRate_err, roll_err, pitch_err, yaw);
+    // ----------- Set servo and thrust ------------
+    MapMomentsToServoAngles((double)U_K(0), (double)U_K(1), (double)U_K(2), throttle);
+
+    Motor_SetSpeed(throttle);
+
+  } else {
+    // In emergency stop, set everything to safe state
+    Motor_SetSpeed(0);
+  }
+  // Indicate new data is ready for main loop processing
+  newDataReady = true;
+}
 
 // Function to process servo/motor commands from string input
 void processSerialCommand(String input) {
@@ -198,7 +274,13 @@ void setup() {
                0.0121,    0.1928 ,   0.0070,
                0.0024,    0.0070 ,   0.1443;
   Rw = Rw_unscaled * 1e-3;
- 
+
+  // Initialize control loop timer for 100 Hz operation
+  if (controlTimer.begin(controlLoopISR, CONTROL_INTERVAL * 1000)) {
+    Serial.println("Control loop timer started at 100 Hz.");
+  } else {
+    Serial.println("Error: Control loop timer failed to initialize!");
+  } 
 }
 
 void loop() {
@@ -208,77 +290,6 @@ void loop() {
     if (sdLogger.isReady()) {
       sdLogger.logMessage("Flight started - Loop timestamp zero point set");
     }
-  }
-
-  // 100Hz control loop - only run if 10ms has passed
-  unsigned long currentTime = millis();
-  if (currentTime - lastControlTime >= CONTROL_INTERVAL) {
-    lastControlTime = currentTime;
-
-    // Check killswitch - if under center (127), activate emergency stop
-    if (killSwitchValue < 127) {
-      emergencyStop = true;
-    } else {
-      emergencyStop = false;
-    }
-
-    // --------- Read IMU & get attitude ---------
-    IMU_Read(ax_ms2, ay_ms2, az_ms2, gx_rps, gy_rps, gz_rps, mx_raw, my_raw, mz_raw);
-
-    Eigen::Vector3d acc_input(ax_ms2 - Acc_Bias[0],
-                              ay_ms2 - Acc_Bias[1],
-                              az_ms2 - Acc_Bias[2]);
-
-    Eigen::Vector3d gyro_input(gx_rps - Gyro_Bias[0],
-                               gy_rps - Gyro_Bias[1],
-                               gz_rps - Gyro_Bias[2]);
-
-    filter.updateIMU(gyro_input[0] * 180 / M_PI, gyro_input[1] * 180 / M_PI, gyro_input[2] * 180 / M_PI,
-                      acc_input[0], acc_input[1], acc_input[2]);
-
-    // Get raw angles from filter
-    double roll_raw = filter.getRoll();
-    double pitch_raw = filter.getPitch();
-    double yaw_raw = 180.0 - filter.getYaw();
-    
-    // Apply lowpass filter to roll, pitch, yaw
-    static double roll_filtered = 0.0;
-    static double pitch_filtered = 0.0;
-    static double yaw_filtered = 0.0;
-    static bool first_run = true;
-    
-    if (first_run) {
-        // Initialize filters with first values
-        roll_filtered = roll_raw;
-        pitch_filtered = pitch_raw;
-        yaw_filtered = yaw_raw;
-        first_run = false;
-    }
-    
-    // Lowpass filter coefficient (0 < alpha < 1, smaller = more filtering)
-    const double alpha = 0.1;
-    roll_filtered = alpha * roll_raw + (1.0 - alpha) * roll_filtered;
-    pitch_filtered = alpha * pitch_raw + (1.0 - alpha) * pitch_filtered;
-    yaw_filtered = alpha * yaw_raw + (1.0 - alpha) * yaw_filtered;
-    
-    // Update global variables with filtered values
-    roll = roll_filtered;
-    pitch = pitch_filtered;
-    yaw = yaw_filtered;
-
-    // ----------- Calculate K gain ----------------
-    double roll_err = (roll - ref_roll)*M_PI/180.0;
-    double pitch_err = (pitch - ref_pitch)*M_PI/180.0;
-    double yawRate_err = (gyro_input[2] - ref_yawRate)*M_PI/180.0;
-
-    //State feedback control vector State vector [p q r phi_err theta_err psi]'
-    Eigen::Vector3d U_K = U_K_att(gyro_input[0], gyro_input[1], yawRate_err, roll_err, pitch_err, yaw);
-
-    // ----------- Set servo and thrust ------------
-    MapMomentsToServoAngles((double)U_K(0), (double)U_K(1), (double)U_K(2), throttle);
-
-    Motor_SetSpeed(throttle);
-
   }
 
   if (Serial.available() > 0) {
@@ -294,37 +305,38 @@ void loop() {
     }
   }
   
-//Emergency stop loop
- while (emergencyStop) {
-   // Set everything to safe state once
-   //ServoControl_SetAngle(0, 0, 0, 0);
-   Motor_SetSpeed(0);
-   Serial.println("*** EMERGENCY STOP ACTIVE - KillSwitch < 127 ***");
+  //Emergency stop loop
+  while (emergencyStop) {
+    // Set everything to safe state once
+    //ServoControl_SetAngle(0, 0, 0, 0);
+    Motor_SetSpeed(0);
+    Serial.println("*** EMERGENCY STOP ACTIVE - KillSwitch < 127 ***");
    
-   // Wait and recheck killswitch
-   delay(500);
-   handController.readInputs();
-   if (killSwitchValue >= 127) {
-     emergencyStop = false;
-     Serial.println("Emergency stop cleared - System operational");
-     break;
-   }
- }
+    // Wait and recheck killswitch
+    delay(500);
+    handController.readInputs();
+    if (killSwitchValue >= 127) {
+      emergencyStop = false;
+      Serial.println("Emergency stop cleared - System operational");
+      break;
+    }
+  }
  
  // Log flight data continuously
- if (sdLogger.isReady() && (currentTime - lastLogTime >= LOG_INTERVAL)) {
-   // Log with timestamp relative to loop start (flight time)
-   sdLogger.logDataWithCustomTime(currentTime - loopStartTime, throttle, roll, pitch, yaw, killSwitchValue, emergencyStop, ax_ms2, ay_ms2, az_ms2, gx_rps, gy_rps, gz_rps);
-   lastLogTime = currentTime;
- }
+  currentTime = millis();
+  if (sdLogger.isReady() && (currentTime - lastLogTime >= LOG_INTERVAL)) {
+    // Log with timestamp relative to loop start (flight time)
+    sdLogger.logDataWithCustomTime(currentTime - loopStartTime, throttle, roll, pitch, yaw, killSwitchValue, emergencyStop, ax_ms2, ay_ms2, az_ms2, gx_rps, gy_rps, gz_rps);
+    lastLogTime = currentTime;
+  }
  
- // Print debug info periodically
- if (currentTime - lastDebugTime >= DEBUG_INTERVAL) {
-   int flightTime = (currentTime - loopStartTime);
-   //Serial.print(String(throttle) + " " + String(roll,3) + " " + String(pitch,3) + " " + String(yaw,3) + "\n");
-   //Serial.println("T:" + String(flightTime, 1) + "s | IMU[AX:" + String(ax_ms2, 2) + " AY:" + String(ay_ms2, 2) + " AZ:" + String(az_ms2, 2) +
-   //               " GX:" + String(gx_dps, 2) + " GY:" + String(gy_dps, 2) + " GZ:" + String(gz_dps, 2) +
-   //               " MX:" + String(mx, 1) + " MY:" + String(my, 1) + " MZ:" + String(mz, 1) + "]");
+  // Print debug info periodically
+  if (currentTime - lastDebugTime >= DEBUG_INTERVAL) {
+    int flightTime = (currentTime - loopStartTime);
+    //Serial.print(String(throttle) + " " + String(roll,3) + " " + String(pitch,3) + " " + String(yaw,3) + "\n");
+    //Serial.println("T:" + String(flightTime, 1) + "s | IMU[AX:" + String(ax_ms2, 2) + " AY:" + String(ay_ms2, 2) + " AZ:" + String(az_ms2, 2) +
+    //               " GX:" + String(gx_dps, 2) + " GY:" + String(gy_dps, 2) + " GZ:" + String(gz_dps, 2) +
+    //               " MX:" + String(mx, 1) + " MY:" + String(my, 1) + " MZ:" + String(mz, 1) + "]");
    lastDebugTime = currentTime;
  }
 }

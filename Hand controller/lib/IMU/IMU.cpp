@@ -50,21 +50,7 @@ void akReadBytes(uint8_t reg, uint8_t *buf, uint8_t len) {
   }
 }
 
-void ScaleGyro(int16_t gx_raw, int16_t gy_raw, int16_t gz_raw,
-               float &gx_rps, float &gy_rps, float &gz_rps)
-{
-    gx_rps = (float)gx_raw / sensitivity * M_PI/180.0;
-    gy_rps = (float)gy_raw / sensitivity * M_PI/180.0;
-    gz_rps = (float)gz_raw / sensitivity * M_PI/180.0;
-}
 
-void ScaleAcc(int16_t ax_raw, int16_t ay_raw, int16_t az_raw,
-                float &ax_ms2, float &ay_ms2, float &az_ms2)
-{
-    ax_ms2 = (float)ax_raw * gravity / ACC_SENS;
-    ay_ms2 = (float)ay_raw * gravity / ACC_SENS;
-    az_ms2 = (float)az_raw * gravity / ACC_SENS;
-}
 void icmSetSampleRate(uint16_t rate_hz) {
   if (rate_hz > 1000) rate_hz = 1000;
   if (rate_hz < 4)    rate_hz = 4;   
@@ -155,13 +141,13 @@ void IMU_Read(float &ax_ms2, float &ay_ms2, float &az_ms2,
     gz = (int16_t)((buf[12] << 8) | buf[13]);
 
     // Return in rad/s and m/s^2
-    gx_dps = ((float)gx / sensitivity) * M_PI/180.0;
-    gy_dps = ((float)gy / sensitivity) * M_PI/180.0;
-    gz_dps = ((float)gz / sensitivity) * M_PI/180.0;
+    gx_dps = ((float)gx / SENSITIVITY) * M_PI/180.0;
+    gy_dps = ((float)gy / SENSITIVITY) * M_PI/180.0;
+    gz_dps = ((float)gz / SENSITIVITY) * M_PI/180.0;
     
-    ax_ms2 = (float)ax * gravity / ACC_SENS;
-    ay_ms2 = (float)ay * gravity / ACC_SENS;
-    az_ms2 = (float)az * gravity / ACC_SENS;
+    ax_ms2 = (float)ax * GRAVITY / ACC_SENS;
+    ay_ms2 = (float)ay * GRAVITY / ACC_SENS;
+    az_ms2 = (float)az * GRAVITY / ACC_SENS;
     
     // ---------- MAG ----------
     int16_t mx_new, my_new, mz_new;
