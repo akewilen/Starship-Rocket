@@ -1,41 +1,68 @@
 #ifndef HANDCONTROLLER_H
 #define HANDCONTROLLER_H
 
-//grey pin 0
-//green 27
-//purple 26
-//yellow 1
-
-#define THROTTLE_PIN 1
-#define PITCH_PIN 27
-#define YAW_PIN 26
-#define ROLL_PIN 28
-#define KILL_SWITCH_PIN 0
-
 #include "stdint.h"
+#include "Arduino.h"
 
-// PPM signal constants
-#define PPM_MIN_PULSE 1000    // Minimum pulse width in microseconds
-#define PPM_MAX_PULSE 2000    // Maximum pulse width in microseconds
-#define PPM_CENTER_PULSE 1500 // Center/neutral pulse width
-#define PPM_TIMEOUT 5000      // Timeout for pulseIn() in microseconds (5ms)
+// Serial communication protocol constants
+#define PACKET_START 0xAA
+#define PACKET_END 0x55
+#define PACKET_SIZE 8
+
+// Use Serial7 on Teensy 4.1 (RX on pin 28)
+#define PPM_SERIAL Serial7
 
 class HandController {
-  public:
-    void attach(uint8_t &throttleRef, uint8_t &pitchRef, uint8_t &yawRef, uint8_t &rollRef, uint8_t &killSwitchRef);
-    void readInputs();
+public:
+    // Throttle is uint8_t (0-255)
+    // Roll, Pitch, Yaw are double references in degrees (-5 to +5)
+    // emergencyStop is set directly when killswitch < threshold
+    void attach(uint8_t &throttleRef, double &refRoll, double &refPitch, double &refYawRate, volatile bool &emergencyStopRef);
     void init();
+    void readInputs();
+    void debugPPM(); // Debug method to check received values
     
-  private:
-    uint16_t readPPMPulse(uint8_t pin);           // Read PPM pulse width
-    uint8_t pulseToValue(uint16_t pulseWidth);    // Convert pulse width to 0-255 value
-    bool isPulseValid(uint16_t pulseWidth);       // Check if pulse is within valid range
+    // Status info
+    bool isConnected() { return lastPacketTime > 0 && (millis() - lastPacketTime) < 500; }
+    unsigned long getLastPacketTime() { return lastPacketTime; }
+    uint32_t getPacketCount() { return packetCount; }
+    uint32_t getErrorCount() { return errorCount; }
+    
+private:
+    bool parsePacket();
+    uint8_t calculateChecksum(uint8_t* data, uint8_t len);
+    double mapWithDeadZone(uint8_t value); // Maps 0-255 to -5 to +5 deg with dead zone
     
     uint8_t *throttle;
-    uint8_t *pitch;
-    uint8_t *yaw;
-    uint8_t *roll;
-    uint8_t *killSwitch;
+    double *refRoll;
+    double *refPitch;
+    double *refYawRate;
+    volatile bool *emergencyStop;
+    
+    // Receive buffer
+    uint8_t rxBuffer[PACKET_SIZE];
+    uint8_t rxIndex = 0;
+    bool inPacket = false;
+    
+    // Cached raw values from packet (0-255)
+    uint8_t lastThrottle = 0;
+    uint8_t lastRawRoll = 127;
+    uint8_t lastRawPitch = 127;
+    uint8_t lastRawYawRate = 127;
+    uint8_t lastKillSwitch = 210; // Safe state (above 127)
+    
+    // Kill switch threshold
+    static constexpr uint8_t KILL_SWITCH_THRESHOLD = 127;
+    
+    // Dead zone constants
+    static constexpr uint8_t DEAD_ZONE_LOW = 120;
+    static constexpr uint8_t DEAD_ZONE_HIGH = 134;
+    static constexpr double MAX_ANGLE_DEG = 5.0;
+    
+    // Statistics
+    unsigned long lastPacketTime = 0;
+    uint32_t packetCount = 0;
+    uint32_t errorCount = 0;
 };
 
 #endif
