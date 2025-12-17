@@ -81,7 +81,7 @@ void MapMomentsToServoAngles(double Mx, double My, double Mz, uint8_t throttle) 
     roll_rudder = MX_MY_SLOPE*Mx*throttleCompensation*0.5f;
     pitch_rudder = MX_MY_SLOPE*My*throttleCompensation*0.5f;
     yaw_rudder = MX_MY_SLOPE*0.5f*Mz*throttleCompensation;
-    yaw_rudder = 0;
+    //yaw_rudder = 0.0; // Disable yaw for now
 
     // Constrain rudder angles to -45 to +45 degrees
     roll_rudder = constrain(roll_rudder, -45.0, 45.0);

@@ -28,7 +28,8 @@ public:
     bool logDataWithCustomTime(unsigned long customTime, uint8_t throttle, double roll, double pitch, double yaw, 
                               uint8_t killSwitch, bool emergencyStop, 
                               float ax_ms2, float ay_ms2, float az_ms2,
-                              float gx_dps, float gy_dps, float gz_dps);
+                              float gx_dps, float gy_dps, float gz_dps,
+                              double ref_roll = 0.0, double ref_pitch = 0.0, double ref_yawRate = 0.0);
     
     // Log custom message
     bool logMessage(const String& message);

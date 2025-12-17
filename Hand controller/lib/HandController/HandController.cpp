@@ -33,6 +33,26 @@ double HandController::mapWithDeadZone(uint8_t value) {
     return ((double)(value - DEAD_ZONE_HIGH) / (255 - DEAD_ZONE_HIGH)) * MAX_ANGLE_DEG;
 }
 
+// Map 0-255 to -36 to +36 degrees/sec for yaw rate with dead zone (120-134 -> 0)
+double HandController::mapYawRateWithDeadZone(uint8_t value) {
+    const double MAX_YAW_RATE_DEG = 36.0;
+    
+    // Dead zone: 120-134 maps to 0
+    if (value >= DEAD_ZONE_LOW && value <= DEAD_ZONE_HIGH) {
+        return 0.0;
+    }
+    
+    // Below dead zone: map 0-119 to -36 to ~0
+    if (value < DEAD_ZONE_LOW) {
+        // 0 -> -36.0, 119 -> small negative (just before dead zone)
+        return ((double)value / DEAD_ZONE_LOW) * MAX_YAW_RATE_DEG - MAX_YAW_RATE_DEG;
+    }
+    
+    // Above dead zone: map 135-255 to ~0 to +36
+    // 135 -> small positive, 255 -> +36.0
+    return ((double)(value - DEAD_ZONE_HIGH) / (255 - DEAD_ZONE_HIGH)) * MAX_YAW_RATE_DEG;
+}
+
 void HandController::init() {
     // Initialize Serial7 for receiving PPM data from Arduino Nano
     // RX7 is on pin 28
@@ -71,7 +91,7 @@ void HandController::readInputs() {
                     if (throttle) *throttle = (uint8_t)((lastThrottle * 100) / 255);
                     if (refRoll) *refRoll = mapWithDeadZone(lastRawRoll);
                     if (refPitch) *refPitch = mapWithDeadZone(lastRawPitch);
-                    if (refYawRate) *refYawRate = mapWithDeadZone(lastRawYawRate);
+                    if (refYawRate) *refYawRate = mapYawRateWithDeadZone(lastRawYawRate);
                     
                     // Set emergencyStop based on kill switch threshold
                     if (emergencyStop) {
@@ -163,9 +183,10 @@ void HandController::debugPPM() {
     Serial.print(" K:"); Serial.println(lastKillSwitch);
     
     Serial.print("Mapped Values (deg): ");
-    Serial.print("Roll:"); Serial.print(mapWithDeadZone(lastRawRoll), 2);
+    Serial.print("T:"); Serial.print((lastThrottle * 100) / 255, 1);
+    Serial.print(" Roll:"); Serial.print(mapWithDeadZone(lastRawRoll), 2);
     Serial.print(" Pitch:"); Serial.print(mapWithDeadZone(lastRawPitch), 2);
-    Serial.print(" YawRate:"); Serial.print(mapWithDeadZone(lastRawYawRate), 2);
+    Serial.print(" YawRate:"); Serial.print(mapYawRateWithDeadZone(lastRawYawRate), 2);
     Serial.println();
     
     Serial.print("Emergency Stop: ");

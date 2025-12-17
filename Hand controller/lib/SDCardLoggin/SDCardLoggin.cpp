@@ -61,12 +61,13 @@ bool SDCardLogger::logData(uint8_t throttle, double roll, double pitch, double y
 bool SDCardLogger::logDataWithCustomTime(unsigned long customTime, uint8_t throttle, double roll, double pitch, double yaw,
                                         uint8_t killSwitch, bool emergencyStop,
                                         float ax_ms2, float ay_ms2, float az_ms2,
-                                        float gx_dps, float gy_dps, float gz_dps) {
+                                        float gx_dps, float gy_dps, float gz_dps,
+                                        double ref_roll, double ref_pitch, double ref_yawRate) {
     if (!sdReady || !logFile) {
         return false;
     }
     
-    // Create CSV row: timestamp,throttle,pitch,yaw,roll,killswitch,emergency,ax_ms2,ay_ms2,az_ms2,gx_dps,gy_dps,gz_dps
+    // Create CSV row: timestamp,throttle,pitch,yaw,roll,killswitch,emergency,ax_ms2,ay_ms2,az_ms2,gx_dps,gy_dps,gz_dps,ref_roll,ref_pitch,ref_yawRate
     String logEntry = String(customTime) + "," +
                      String(throttle) + "," +
                      String(roll) + "," +
@@ -79,7 +80,10 @@ bool SDCardLogger::logDataWithCustomTime(unsigned long customTime, uint8_t throt
                      String(az_ms2, 5) + "," +
                      String(gx_dps, 5) + "," +
                      String(gy_dps, 5) + "," +
-                     String(gz_dps, 5);
+                     String(gz_dps, 5) + "," +
+                     String(ref_roll, 5) + "," +
+                     String(ref_pitch, 5) + "," +
+                     String(ref_yawRate, 5);
     
     // Write to file
     logFile.println(logEntry);
@@ -143,7 +147,7 @@ bool SDCardLogger::writeCSVHeader() {
     if (!logFile) return false;
     
     // Write CSV header with all columns
-    String header = "Timestamp,Throttle,Roll,Pitch,Yaw,KillSwitch,Emergency,Ax_ms2,Ay_ms2,Az_ms2,Gx_rps,Gy_rps,Gz_rps";
+    String header = "Timestamp,Throttle,Roll,Pitch,Yaw,KillSwitch,Emergency,Ax_ms2,Ay_ms2,Az_ms2,Gx_rps,Gy_rps,Gz_rps,Ref_Roll,Ref_Pitch,Ref_YawRate";
     logFile.println(header);
     
     // Write metadata comments

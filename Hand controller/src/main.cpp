@@ -8,7 +8,7 @@
 #include <Wire.h>
 #include <MadgwickAHRS.h>
 #include <Kgain.h>
-#define SERIAL_BAUD_RATE 9600
+#define SERIAL_BAUD_RATE 115200
 
 
 // IMU raw values (int16_t from sensors)
@@ -24,7 +24,15 @@ Eigen::Vector3d Acc_Bias(0.0, 0.0, 0.0); // Ax, Ay, Az
 Eigen::Vector3d Gyro_Bias(0.0, 0.0, 0.0); // Gx, Gy, Gz
 Eigen::Vector3d Mag_Bias(0.0, 0.0, 0.0); // Mx, My, Mz
 
-double roll; double pitch; double yaw;
+double roll, pitch, yaw;
+double roll_err_int, pitch_err_int, yawRate_err_int;
+
+// Previous error and anti-windup terms for trapezoidal integration
+double prev_roll_err = 0.0, prev_pitch_err = 0.0, prev_yawRate_err = 0.0;
+// Previous yaw for derivative calculation
+static double prev_yaw = 0.0;
+static bool yaw_init = true;
+Eigen::Vector3d prev_aw_term(0.0, 0.0, 0.0);
 
 uint8_t ref_throttle = 0;
 double ref_roll = 0; double ref_pitch = 0; double ref_yawRate = 0;
@@ -42,6 +50,7 @@ unsigned long loopStartTime = 0;  // Timestamp zero point
 const unsigned long DEBUG_INTERVAL = 250; // Print debug info every 100ms
 const unsigned long LOG_INTERVAL = 10;    // Log data every 10ms
 const unsigned long CONTROL_INTERVAL = 10; // Control loop every 10ms (100 Hz)
+volatile double dt_s = 0.01; // Control loop time step in seconds
 
 Eigen::Matrix4d P0 = Eigen::Matrix4d::Identity();
 Eigen::Matrix3d Rw, Rw_unscaled;
@@ -83,46 +92,91 @@ void controlLoopISR() {
 
     filter.updateIMU(gyro_input[0] * 180 / M_PI, gyro_input[1] * 180 / M_PI, gyro_input[2] * 180 / M_PI,
                       acc_input[0], acc_input[1], acc_input[2]);
-    // Get raw angles from filter
-    double roll_raw = filter.getRoll();
-    double pitch_raw = filter.getPitch();
-    double yaw_raw = 180.0 - filter.getYaw();
+    // Get angles directly from filter (no additional filtering)
+    roll = filter.getRoll();
+    pitch = filter.getPitch();
+    yaw = 180.0 - filter.getYaw();
     
-    // Apply lowpass filter to roll, pitch, yaw
-    static double roll_filtered = 0.0;
-    static double pitch_filtered = 0.0;
-    static double yaw_filtered = 0.0;
-    static bool first_run = true;
-    
-    if (first_run) {
-        // Initialize filters with first values
-        roll_filtered = roll_raw;
-        pitch_filtered = pitch_raw;
-        yaw_filtered = yaw_raw;
-        first_run = false;
+    // Calculate yaw rate from derivative of filtered yaw (less noisy than gyro)
+    double yawRate;
+    if (yaw_init) {
+        prev_yaw = yaw;
+        yawRate = 0.0;
+        yaw_init = false;
+    } else {
+        yawRate = (yaw - prev_yaw) / dt_s; // deg/s
+        prev_yaw = yaw;
     }
-
-    // Lowpass filter coefficient (0 < alpha < 1, smaller = more filtering)
-    const double alpha = 0.1;
-    roll_filtered = alpha * roll_raw + (1.0 - alpha) * roll_filtered;
-    pitch_filtered = alpha * pitch_raw + (1.0 - alpha) * pitch_filtered;
-    yaw_filtered = alpha * yaw_raw + (1.0 - alpha) * yaw_filtered;
-
-    // Update global variables with filtered values
-    roll = roll_filtered;
-    pitch = pitch_filtered;
-    yaw = yaw_filtered;
 
     // ----------- Calculate K gain ----------------
     double roll_err = (roll - ref_roll)*M_PI/180.0;
     double pitch_err = (pitch - ref_pitch)*M_PI/180.0;
-    double yawRate_err = (gyro_input[2] - ref_yawRate)*M_PI/180.0;
+    double yawRate_err = (yawRate - ref_yawRate)*M_PI/180.0;
     //State feedback control vector State vector [p q r phi_err theta_err psi]'
-    Eigen::Vector3d U_K = U_K_att(gyro_input[0], gyro_input[1], yawRate_err, roll_err, pitch_err, yaw);
+
+    // 1. Calculate unconstrained moment (what LQR wants)
+    Eigen::Vector3d U_K = U_K_att(gyro_input[0], gyro_input[1], gyro_input[2], roll_err, pitch_err, 0.0);
+    Eigen::Vector3d U_K_I_result = U_K_I(roll_err_int, pitch_err_int, yawRate_err_int);
+    Eigen::Vector3d U_K_unconstrained = U_K + U_K_I_result;
+    
+    // 2. Apply physical limits (Saturation)
+    // Moment saturation limits based on ±45 degree rudder limits
+    // From ServoControl: rudder = MX_MY_SLOPE * Moment * throttleCompensation * 0.5
+    // At worst case throttleCompensation = 0.8039, MX_MY_SLOPE = 24.3309
+    const double MOMENT_SAT_LIMIT = 4.6; // ±45 deg / (24.3309 * 0.8039 * 0.5)
+    
+    Eigen::Vector3d U_K_saturated = U_K_unconstrained;
+    U_K_saturated(0) = constrain(U_K_saturated(0), -MOMENT_SAT_LIMIT, MOMENT_SAT_LIMIT);
+    U_K_saturated(1) = constrain(U_K_saturated(1), -MOMENT_SAT_LIMIT, MOMENT_SAT_LIMIT);  
+    U_K_saturated(2) = constrain(U_K_saturated(2), -MOMENT_SAT_LIMIT, MOMENT_SAT_LIMIT);
+    
+    // 3. Update the Integrator with Anti-Windup
+    Eigen::Vector3d saturation_error = U_K_saturated - U_K_unconstrained;
+    Integral_Error_Update_AntiWindup(roll_err, pitch_err, yawRate_err, dt_s, 
+                                    roll_err_int, pitch_err_int, yawRate_err_int,
+                                    saturation_error, prev_roll_err, prev_pitch_err, prev_yawRate_err, prev_aw_term);
+
+    // 4. Apply lowpass filter to control outputs for actuator smoothing
+    static Eigen::Vector3d U_K_filtered(0.0, 0.0, 0.0);
+    static bool control_filter_init = true;
+    
+    if (control_filter_init) {
+        U_K_filtered = U_K_saturated;
+        control_filter_init = false;
+    }
+    
+    // Lowpass filter coefficient (0 < alpha < 1, smaller = more filtering)
+    const double alpha_control = 0.3;  // Less aggressive filtering than orientation
+    U_K_filtered = alpha_control * U_K_saturated + (1.0 - alpha_control) * U_K_filtered;
+
     // ----------- Set servo and thrust ------------
-    MapMomentsToServoAngles((double)U_K(0), (double)U_K(1), (double)U_K(2), ref_throttle);
+    MapMomentsToServoAngles((double)U_K_filtered(0), (double)U_K_filtered(1), (double)U_K_filtered(2), ref_throttle);
 
     Motor_SetSpeed(ref_throttle);
+
+    //Print control data for live plotting: ref_angles actual_angles errors integrals unconstrained_moments saturated_moments filtered_moments
+    Serial.print(ref_roll); Serial.print(" ");
+    Serial.print(ref_pitch); Serial.print(" ");
+    Serial.print(ref_yawRate); Serial.print(" ");
+    Serial.print(roll); Serial.print(" ");
+    Serial.print(pitch); Serial.print(" ");
+    Serial.print(yawRate); Serial.print(" ");
+    Serial.print(roll_err*180.0/M_PI); Serial.print(" ");
+    Serial.print(pitch_err*180.0/M_PI); Serial.print(" ");  
+    Serial.print(yawRate_err*180.0/M_PI); Serial.print(" ");
+    Serial.print(U_K_I_result(0)); Serial.print(" ");
+    Serial.print(U_K_I_result(1)); Serial.print(" ");
+    Serial.print(U_K_I_result(2)); Serial.print(" ");
+    Serial.print(U_K_unconstrained(0)); Serial.print(" ");
+    Serial.print(U_K_unconstrained(1)); Serial.print(" ");
+    Serial.print(U_K_unconstrained(2)); Serial.print(" ");
+    Serial.print(U_K_saturated(0)); Serial.print(" ");
+    Serial.print(U_K_saturated(1)); Serial.print(" ");
+    Serial.print(U_K_saturated(2)); Serial.print(" ");
+    Serial.print(U_K_filtered(0)); Serial.print(" ");
+    Serial.print(U_K_filtered(1)); Serial.print(" ");
+    Serial.print(U_K_filtered(2)); Serial.print(" ");
+    Serial.println(ref_throttle);
 
   } else {
     // In emergency stop, set everything to safe state
@@ -336,13 +390,15 @@ void loop() {
     // Log with timestamp relative to loop start (flight time)
     // Pass emergencyStop as kill indicator: 0=killed, 255=safe
     uint8_t killIndicator = emergencyStop ? 0 : 255;
-    sdLogger.logDataWithCustomTime(currentTime - loopStartTime, ref_throttle, roll, pitch, yaw, killIndicator, emergencyStop, ax_ms2, ay_ms2, az_ms2, gx_rps, gy_rps, gz_rps);
+    sdLogger.logDataWithCustomTime(currentTime - loopStartTime, ref_throttle, roll, pitch, yaw, killIndicator, 
+                                  emergencyStop, ax_ms2, ay_ms2, az_ms2, gx_rps, gy_rps, gz_rps,
+                                  ref_roll, ref_pitch, ref_yawRate);
     lastLogTime = currentTime;
   }
  
   // Print debug info periodically
   if (currentTime - lastDebugTime >= DEBUG_INTERVAL) {
-    printPPMDebug();
+    //printPPMDebug();
    lastDebugTime = currentTime;
  }
 }

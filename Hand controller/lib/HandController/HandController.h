@@ -32,6 +32,7 @@ private:
     bool parsePacket();
     uint8_t calculateChecksum(uint8_t* data, uint8_t len);
     double mapWithDeadZone(uint8_t value); // Maps 0-255 to -5 to +5 deg with dead zone
+    double mapYawRateWithDeadZone(uint8_t value); // Maps 0-255 to -36 to +36 deg/s with dead zone
     
     uint8_t *throttle;
     double *refRoll;
