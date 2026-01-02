@@ -13,7 +13,7 @@ Iz = 0.160;
 g = 9.82;
 h = 0.4345;
 L = 0.4345; % lenght from rudder center to COM
-Ts = 0.01;
+Ts = 0.005;
 
 Imatrix = diag([Ix,Iy,Iz]);
 
@@ -76,15 +76,15 @@ B_aug = [B_att;               % Top 6 rows
 
 
 % Q_att: [p, q, r, phi, theta, psi]
-Q_att_diag = diag([5000, 5000, 500, 100000, 100000, 100]); 
+Q_att_diag = diag([1000, 1000, 5000, 500003, 500003, 1000]); 
 
 % Q_aug (7x7) - Add weight for the integral state (x_I)
 % High weight on Q_I forces the integral error to zero quickly.
-Q_I_weight = diag([10001 100 100]); % Tune this to control integral action aggressiveness
+Q_I_weight = diag([1000 1000 1000]); % Tune this to control integral action aggressiveness
 Q_aug = blkdiag(Q_att_diag, Q_I_weight);
 
 % R_att (3x3) - Input cost [Mx, My, Mz]
-R_att = 30*diag([1, 1, 1]);
+R_att = 10000*diag([1, 1, 1]);
 
 % --- COMPUTE LQI GAIN ---
 %K_aug = lqr(A_aug, B_aug, Q_aug, R_att);
