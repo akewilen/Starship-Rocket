@@ -80,7 +80,7 @@ bool akReadMag(int16_t &mx, int16_t &my, int16_t &mz) {
   return true;
 }
 
-void IMU_Init() {
+void IMU_Init(uint16_t icm_sample_rate_hz) {
   // Set I2C pins BEFORE calling Wire.begin() on Teensy 4.1
   Wire.setSDA(IMU_PIN_SDA);
   Wire.setSCL(IMU_PIN_SCL);
@@ -104,7 +104,7 @@ void IMU_Init() {
   // Wake up device: clear SLEEP bit in PWR_MGMT_1 (0x6B)
   icmWrite(REG_PWR_MGMT1, 0x00);
   delay(100);
-  icmSetSampleRate(100);
+  icmSetSampleRate(icm_sample_rate_hz);
   Serial.println("IMU: ICM20600 configured");
   
   // ----- AK09918 init -----

@@ -55,7 +55,7 @@
 #define ACC_SENS 16384.0f   // LSB/g for ±2g
 #define GRAVITY 9.81f
 
-void IMU_Init();
+void IMU_Init(uint16_t icm_sample_rate_hz);
 void IMU_Read(float &ax_ms2, float &ay_ms2, float &az_ms2,
               float &gx_dps, float &gy_dps, float &gz_dps,
               int16_t &mx, int16_t &my, int16_t &mz);

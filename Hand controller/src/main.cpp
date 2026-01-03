@@ -50,7 +50,11 @@ unsigned long loopStartTime = 0;  // Timestamp zero point
 const unsigned long DEBUG_INTERVAL = 250; // Print debug info every 100ms
 const unsigned long LOG_INTERVAL = 10;    // Log data every 10ms
 const unsigned long CONTROL_INTERVAL = 10; // Control loop every 10ms (100 Hz)
-volatile double dt_s = 0.01; // Control loop time step in seconds
+volatile double dt_s = 0.010; // Control loop time step in seconds
+
+// IMU lowpass filter coefficients (0 < alpha < 1, smaller = more filtering)
+const double alpha_gyro = 0.4;  // Less aggressive filtering for 100Hz
+const double alpha_acc = 0.2;   // Moderate filtering for 100Hz
 
 Eigen::Matrix4d P0 = Eigen::Matrix4d::Identity();
 Eigen::Matrix3d Rw, Rw_unscaled;
@@ -90,8 +94,23 @@ void controlLoopISR() {
                                gy_rps - Gyro_Bias[1],
                                gz_rps - Gyro_Bias[2]);
 
-    filter.updateIMU(gyro_input[0] * 180 / M_PI, gyro_input[1] * 180 / M_PI, gyro_input[2] * 180 / M_PI,
-                      acc_input[0], acc_input[1], acc_input[2]);
+    // Static variables for lowpass filtering IMU data
+    static Eigen::Vector3d acc_filtered(0.0, 0.0, 9.82);
+    static Eigen::Vector3d gyro_filtered(0.0, 0.0, 0.0);
+    static bool imu_filter_init = true;
+    
+    if (imu_filter_init) {
+        acc_filtered = acc_input;
+        gyro_filtered = gyro_input;
+        imu_filter_init = false;
+    }
+    
+    // Apply separate lowpass filtering for gyro and accelerometer
+    acc_filtered = alpha_acc * acc_input + (1.0 - alpha_acc) * acc_filtered;
+    gyro_filtered = alpha_gyro * gyro_input + (1.0 - alpha_gyro) * gyro_filtered;
+
+    filter.updateIMU(gyro_filtered[0] * 180 / M_PI, gyro_filtered[1] * 180 / M_PI, gyro_filtered[2] * 180 / M_PI,
+                      acc_filtered[0], acc_filtered[1], acc_filtered[2]);
     // Get angles directly from filter (no additional filtering)
     roll = filter.getRoll();
     pitch = filter.getPitch();
@@ -187,8 +206,8 @@ void controlLoopISR() {
   unsigned long isrEndTime = micros();
   unsigned long isrExecutionTime = isrEndTime - isrStartTime;
   
-  // Warn if ISR took too long (> 8ms leaves 2ms margin for next cycle)
-  if (isrExecutionTime > 8000) {
+  // Warn if ISR took too long (> 4ms leaves 1ms margin for next cycle)
+  if (isrExecutionTime > 4000) {
     Serial.print("*** WARNING: ISR took ");
     Serial.print(isrExecutionTime);
     Serial.println("μs - Risk of overrun! ***");
@@ -319,7 +338,7 @@ void setup() {
 
   // Initialize IMU
   Serial.println("Initializing IMU...");
-  IMU_Init();
+  IMU_Init( 1000/CONTROL_INTERVAL ); // Set IMU sample rate to match control loop rate (100 Hz)
   Acc_Bias = IMU_ACC_BIAS_READ();
   Gyro_Bias = IMU_GYRO_BIAS_READ();
   Mag_Bias = IMU_MAG_BIAS_READ();
