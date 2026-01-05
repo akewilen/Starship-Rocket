@@ -27,23 +27,41 @@ void ServoControl_SetAngle(int8_t angle1, int8_t angle2, int8_t angle3, int8_t a
     theta4 = int(constrain(theta4, SERVO4_HOME_DEG + SERVO_MIN_ANGLE, SERVO4_HOME_DEG + SERVO_MAX_ANGLE));
 
     // Map angles to servo write values (900-2100 degrees)
-    int servo1_write = map(theta1, 0, 120, 900, 2100);
-    int servo2_write = map(theta2, 0, 120, 900, 2100);
-    int servo3_write = map(theta3, 0, 120, 900, 2100);
-    int servo4_write = map(theta4, 0, 120, 900, 2100);
-    
-    Servo1.write(servo1_write);
-    Servo2.write(servo2_write);
-    Servo3.write(servo3_write);
-    Servo4.write(servo4_write);
+    float servo1_write = map((float)theta1, 0, 120, 900, 2100);
+    float servo2_write = map((float)theta2, 0, 120, 900, 2100);
+    float servo3_write = map((float)theta3, 0, 120, 900, 2100);
+    float servo4_write = map((float)theta4, 0, 120, 900, 2100);
+
+    float dutyCycle1 = servo1_write / 20000.0f; // 20ms period for 50Hz
+    float dutyCycle2 = servo2_write / 20000.0f; //
+    float dutyCycle3 = servo3_write / 20000.0f; //
+    float dutyCycle4 = servo4_write / 20000.0f; // 
+
+    noInterrupts();
+    analogWrite(SERVO1_PIN, uint32_t(dutyCycle1 * 4095)); // 12-bit resolution
+    analogWrite(SERVO2_PIN, uint32_t(dutyCycle2 * 4095)); // 12-bit resolution
+    analogWrite(SERVO3_PIN, uint32_t(dutyCycle3 * 4095)); // 12-bit resolution
+    analogWrite(SERVO4_PIN, uint32_t(dutyCycle4 * 4095)); // 12-bit resolution
+    interrupts();
+
+    //Servo1.write(servo1_write);
+    //Servo2.write(servo2_write);
+    //Servo3.write(servo3_write);
+    //Servo4.write(servo4_write);
 }
 
 void ServoControl_Init()
 {
-    Servo1.attach(SERVO1_PIN);
-    Servo2.attach(SERVO2_PIN);
-    Servo3.attach(SERVO3_PIN);
-    Servo4.attach(SERVO4_PIN);
+    //Servo1.attach(SERVO1_PIN);
+    //Servo2.attach(SERVO2_PIN);
+    //Servo3.attach(SERVO3_PIN);
+    //Servo4.attach(SERVO4_PIN);
+
+    analogWriteResolution(12); // Set PWM resolution to 12 bits (0-4095)
+    analogWriteFrequency(SERVO1_PIN, 50); // Set PWM frequency to 50 Hz
+    analogWriteFrequency(SERVO2_PIN, 50); // Set PWM frequency to 50 Hz
+    analogWriteFrequency(SERVO3_PIN, 50); // Set PWM frequency to 50 Hz
+    analogWriteFrequency(SERVO4_PIN, 50); // Set PWM frequency to
     
     ServoControl_SetAngle(0, 0, 0, 0);
 }

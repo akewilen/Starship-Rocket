@@ -99,16 +99,32 @@ void loop() {
     uint16_t pulseKill = readChannel(KILL_SWITCH_PIN);
     
     // Convert to 0-255 values
-    // Only update if we got a valid pulse (non-zero)
+    // Update values or set safe defaults if no signal
     if (pulseThrottle > 0) {
         throttle = ppmToValue(pulseThrottle);
     } else {
         throttle = 0;  // No signal = throttle off for safety
     }
-    if (pulsePitch > 0) pitch = ppmToValue(pulsePitch);
-    if (pulseYaw > 0) yaw = ppmToValue(pulseYaw);
-    if (pulseRoll > 0) roll = ppmToValue(pulseRoll);
-    if (pulseKill > 0) killSwitch = ppmToValue(pulseKill);
+    if (pulsePitch > 0) {
+        pitch = ppmToValue(pulsePitch);
+    } else {
+        pitch = 127;  // No signal = center position for safety
+    }
+    if (pulseYaw > 0) {
+        yaw = ppmToValue(pulseYaw);
+    } else {
+        yaw = 127;  // No signal = center position for safety
+    }
+    if (pulseRoll > 0) {
+        roll = ppmToValue(pulseRoll);
+    } else {
+        roll = 127;  // No signal = center position for safety
+    }
+    if (pulseKill > 0) {
+        killSwitch = ppmToValue(pulseKill);
+    } else {
+        killSwitch = 210;  // No signal = safe state (kill engaged)
+    }
     
     // Send packet to Teensy
     sendPacket();

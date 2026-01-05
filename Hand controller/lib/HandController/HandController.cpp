@@ -8,7 +8,7 @@ void HandController::attach(uint8_t &throttleRef, double &refRollVal, double &re
     emergencyStop = &emergencyStopRef;
     
     // Initialize with safe values
-    *throttle = lastThrottle;
+    *throttle = 0;
     *refRoll = 0.0;   // Center = 0 degrees
     *refPitch = 0.0;
     *refYawRate = 0.0;

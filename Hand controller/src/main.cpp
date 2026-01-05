@@ -8,6 +8,8 @@
 #include <Wire.h>
 #include <MadgwickAHRS.h>
 #include <Kgain.h>
+#include <PID.h>
+
 #define SERIAL_BAUD_RATE 115200
 
 
@@ -66,6 +68,15 @@ Madgwick filter;
 
 IntervalTimer controlTimer;
 
+PID rollPID(0.0, 0.0, 0.0, -45, 45); // Start with zero gains for tuning
+PID pitchPID(0.0, 0.0, 0.0, -45, 45); // Start with zero gains for tuning
+PID yawRatePID(0.0, 0.0, 0.0, -10, 10); // Start with zero gains for tuning
+
+// Current PID gains for roll/pitch (shared)
+double current_P = 0.0;
+double current_I = 0.0;
+double current_D = 0.0;
+
 void controlLoopISR() {
     // ISR overrun detection
     static volatile bool isrRunning = false;
@@ -112,6 +123,7 @@ void controlLoopISR() {
     filter.updateIMU(gyro_filtered[0] * 180 / M_PI, gyro_filtered[1] * 180 / M_PI, gyro_filtered[2] * 180 / M_PI,
                       acc_filtered[0], acc_filtered[1], acc_filtered[2]);
     // Get angles directly from filter (no additional filtering)
+
     roll = filter.getRoll();
     pitch = filter.getPitch();
     yaw = 180.0 - filter.getYaw();
@@ -132,6 +144,10 @@ void controlLoopISR() {
     double pitch_err = (pitch - ref_pitch)*M_PI/180.0;
     double yawRate_err = (yawRate - ref_yawRate)*M_PI/180.0;
     //State feedback control vector State vector [p q r phi_err theta_err psi]'
+
+    double roll_PID = -rollPID.compute(roll_err, dt_s);
+    double pitch_PID = -pitchPID.compute(pitch_err, dt_s);  
+    double yawRate_PID = -yawRatePID.compute(yawRate_err, dt_s);
 
     // 1. Calculate unconstrained moment (what LQR wants)
     Eigen::Vector3d U_K = U_K_att(gyro_input[0], gyro_input[1], gyro_input[2], roll_err, pitch_err, 0.0);
@@ -169,33 +185,29 @@ void controlLoopISR() {
     U_K_filtered = alpha_control * U_K_saturated + (1.0 - alpha_control) * U_K_filtered;
 
     // ----------- Set servo and thrust ------------
-    MapMomentsToServoAngles((double)U_K_filtered(0), (double)U_K_filtered(1), (double)U_K_filtered(2), ref_throttle);
+    //MapMomentsToServoAngles((double)U_K_filtered(0), (double)U_K_filtered(1), (double)U_K_filtered(2), ref_throttle);
+    
+    ServoControl_SetAngle((int8_t)(-pitch_PID), (int8_t)(-roll_PID), (int8_t)(pitch_PID), (int8_t)(roll_PID));
 
     Motor_SetSpeed(ref_throttle);
 
     //Print control data for live plotting: ref_angles actual_angles errors integrals unconstrained_moments saturated_moments filtered_moments
-    Serial.print(ref_roll); Serial.print(" ");
-    Serial.print(ref_pitch); Serial.print(" ");
-    Serial.print(ref_yawRate); Serial.print(" ");
-    Serial.print(roll); Serial.print(" ");
-    Serial.print(pitch); Serial.print(" ");
-    Serial.print(yawRate); Serial.print(" ");
-    Serial.print(roll_err*180.0/M_PI); Serial.print(" ");
-    Serial.print(pitch_err*180.0/M_PI); Serial.print(" ");  
-    Serial.print(yawRate_err*180.0/M_PI); Serial.print(" ");
-    Serial.print(U_K_I_result(0)); Serial.print(" ");
-    Serial.print(U_K_I_result(1)); Serial.print(" ");
-    Serial.print(U_K_I_result(2)); Serial.print(" ");
-    Serial.print(U_K_unconstrained(0)); Serial.print(" ");
-    Serial.print(U_K_unconstrained(1)); Serial.print(" ");
-    Serial.print(U_K_unconstrained(2)); Serial.print(" ");
-    Serial.print(U_K_saturated(0)); Serial.print(" ");
-    Serial.print(U_K_saturated(1)); Serial.print(" ");
-    Serial.print(U_K_saturated(2)); Serial.print(" ");
-    Serial.print(U_K_filtered(0)); Serial.print(" ");
-    Serial.print(U_K_filtered(1)); Serial.print(" ");
-    Serial.print(U_K_filtered(2)); Serial.print(" ");
-    Serial.println(ref_throttle);
+    //Serial.print(ref_roll); Serial.print(" ");
+    //Serial.print(ref_pitch); Serial.print(" ");
+    //Serial.print(ref_yawRate); Serial.print(" ");
+    //Serial.print(roll); Serial.print(" ");
+    //Serial.print(pitch); Serial.print(" ");
+    //Serial.print(yawRate); Serial.print(" ");
+    //Serial.print(U_K_I_result(0)); Serial.print(" ");
+    //Serial.print(U_K_I_result(1)); Serial.print(" ");
+    //Serial.print(U_K_I_result(2)); Serial.print(" ");
+    //Serial.print(U_K_filtered(0)); Serial.print(" ");
+    //Serial.print(U_K_filtered(1)); Serial.print(" ");
+    //Serial.print(U_K_filtered(2)); Serial.print(" ");
+    //Serial.print(Mx_PID); Serial.print(" ");
+    //Serial.print(My_PID); Serial.print(" ");
+    //Serial.print(Mz_PID); Serial.print(" ");
+    //Serial.println(ref_throttle);
 
   } else {
     // In emergency stop, set everything to safe state
@@ -296,6 +308,67 @@ void processSerialCommand(String input) {
     }
 }
 
+// Function to tune PID values via serial commands
+void PIDtuner(String input) {
+  // Only process commands if system is not in emergency stop
+  if (emergencyStop) {
+    return;
+  }
+  
+  if (input.length() < 2) {
+    Serial.println("Error: Invalid PID command format");
+    Serial.println("Format: P100 (sets P gain to 100), I50 (sets I gain to 50), D25 (sets D gain to 25)");
+    return;
+  }
+  
+  char command = input.charAt(0);
+  String valueStr = input.substring(1);
+  double value = valueStr.toFloat();
+  
+  switch (command) {
+    case 'P':
+    case 'p':
+      current_P = value;
+      rollPID.setGains(current_P, current_I, current_D);
+      pitchPID.setGains(current_P, current_I, current_D);
+      Serial.print("P gain set to: ");
+      Serial.println(value);
+      break;
+      
+    case 'I':
+    case 'i':
+      current_I = value;
+      rollPID.setGains(current_P, current_I, current_D);
+      pitchPID.setGains(current_P, current_I, current_D);
+      Serial.print("I gain set to: ");
+      Serial.println(value);
+      break;
+      
+    case 'D':
+    case 'd':
+      current_D = value;
+      rollPID.setGains(current_P, current_I, current_D);
+      pitchPID.setGains(current_P, current_I, current_D);
+      Serial.print("D gain set to: ");
+      Serial.println(value);
+      break;
+      
+    default:
+      Serial.println("Error: Unknown PID command");
+      Serial.println("Valid commands: P (proportional), I (integral), D (derivative)");
+      Serial.println("Example: P100, I50, D25");
+      break;
+  }
+  
+  // Display current gains
+  Serial.print("Current gains - P: ");
+  Serial.print(current_P);
+  Serial.print(", I: ");
+  Serial.print(current_I);
+  Serial.print(", D: ");
+  Serial.println(current_D);
+}
+
 // Debug function to print PPM values and SD card status
 void printPPMDebug() {
   
@@ -361,6 +434,10 @@ void setup() {
   } else {
     Serial.println("Error: Control loop timer failed to initialize!");
   } 
+
+  rollPID.reset();
+  pitchPID.reset();
+  yawRatePID.reset();
 }
 
 void loop() {
@@ -383,7 +460,8 @@ void loop() {
       Serial.println("SYSTEM OPERATIONAL");
       printPPMDebug();
     } else {
-      processSerialCommand(input);
+      PIDtuner(input);
+      // processSerialCommand(input);  // Commented out - using PIDtuner instead
     }
   }
   

@@ -13,19 +13,32 @@ void Motor_SetSpeed(int8_t speed)
   // Constrain speeds to defined limits
   int motor_speed = int(constrain(speed, Speed_Min, Speed_Max));
 
-
   // Map speed percentage to servo write values (1100-1940 degrees)
-  int motor1_write = map(motor_speed, 0, 100, 1100, 1940);
-  int motor2_write = map(motor_speed, 0, 100, 1100, 1940);
+  float motor1_write = map((float)motor_speed, 0, 100, 1100, 1940);
+  float motor2_write = map((float)motor_speed, 0, 100, 1100, 1940);
+
+  float dutyCycle1 = motor1_write / 20000.0f; // 20ms period for 50Hz
+  float dutyCycle2 = motor2_write / 20000.0f; //
   
-  Motor1.write(motor1_write);
-  Motor2.write(motor2_write);
+  noInterrupts();
+  analogWrite(MOTOR1_PIN, uint32_t(dutyCycle1 * 4095)); // 12-bit resolution
+  analogWrite(MOTOR2_PIN, uint32_t(dutyCycle2 * 4095)); // 12-bit resolution
+  interrupts();
+
+  //Motor1.write(motor1_write);
+  //Motor2.write(motor2_write);
 }
 
 void Motor_Init()
 {
-  Motor1.attach(MOTOR1_PIN);
-  Motor2.attach(MOTOR2_PIN);
+  analogWriteResolution(12); // Set PWM resolution to 12 bits (0-4095)
+  analogWriteFrequency(MOTOR1_PIN, 50); // Set PWM frequency to 50 Hz
+  analogWriteFrequency(MOTOR2_PIN, 50); // Set PWM frequency to 50 Hz
+
+  //Motor1.attach(MOTOR1_PIN);
+  //delay(10); // Short delay to ensure proper initialization
+  //Motor2.attach(MOTOR2_PIN);
+  //delay(10); // Short delay to ensure proper initialization
   
   Motor_SetSpeed(0);
 }

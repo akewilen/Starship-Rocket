@@ -13,11 +13,6 @@ double PID::compute(double error, double dt) {
         return 0.0; // Return 0 on first run to avoid derivative spike
     }
     
-    // Validate time delta
-    if (dt <= 0.0) {
-        return 0.0; // Avoid division by zero or negative dt
-    }
-    
     // Proportional term
     double proportional = kp * error;
     
