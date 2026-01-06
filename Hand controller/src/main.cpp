@@ -68,9 +68,9 @@ Madgwick filter;
 
 IntervalTimer controlTimer;
 
-PID rollPID(0.0, 0.0, 0.0, -45, 45); // Start with zero gains for tuning
-PID pitchPID(0.0, 0.0, 0.0, -45, 45); // Start with zero gains for tuning
-PID yawRatePID(0.0, 0.0, 0.0, -10, 10); // Start with zero gains for tuning
+PID rollPID(100, 5.0, 40, -45, 45); // Start with zero gains for tuning
+PID pitchPID(100, 5.0, 40, -45, 45); // Start with zero gains for tuning
+PID yawRatePID(30, 0.0, 0.0, -10, 10); // Start with zero gains for tuning
 
 // Current PID gains for roll/pitch (shared)
 double current_P = 0.0;
@@ -187,7 +187,8 @@ void controlLoopISR() {
     // ----------- Set servo and thrust ------------
     //MapMomentsToServoAngles((double)U_K_filtered(0), (double)U_K_filtered(1), (double)U_K_filtered(2), ref_throttle);
     
-    ServoControl_SetAngle((int8_t)(-pitch_PID), (int8_t)(-roll_PID), (int8_t)(pitch_PID), (int8_t)(roll_PID));
+    ServoControl_SetAngle((int8_t)(-pitch_PID-yawRate_PID), (int8_t)(-roll_PID-yawRate_PID), 
+                          (int8_t)(pitch_PID-yawRate_PID), (int8_t)(roll_PID-yawRate_PID));
 
     Motor_SetSpeed(ref_throttle);
 
@@ -329,8 +330,9 @@ void PIDtuner(String input) {
     case 'P':
     case 'p':
       current_P = value;
-      rollPID.setGains(current_P, current_I, current_D);
-      pitchPID.setGains(current_P, current_I, current_D);
+      yawRatePID.setGains(current_P, current_I, current_D);
+      //rollPID.setGains(current_P, current_I, current_D);
+      //pitchPID.setGains(current_P, current_I, current_D);
       Serial.print("P gain set to: ");
       Serial.println(value);
       break;
@@ -338,8 +340,9 @@ void PIDtuner(String input) {
     case 'I':
     case 'i':
       current_I = value;
-      rollPID.setGains(current_P, current_I, current_D);
-      pitchPID.setGains(current_P, current_I, current_D);
+      yawRatePID.setGains(current_P, current_I, current_D);
+      //rollPID.setGains(current_P, current_I, current_D);
+      //pitchPID.setGains(current_P, current_I, current_D);
       Serial.print("I gain set to: ");
       Serial.println(value);
       break;
@@ -347,8 +350,9 @@ void PIDtuner(String input) {
     case 'D':
     case 'd':
       current_D = value;
-      rollPID.setGains(current_P, current_I, current_D);
-      pitchPID.setGains(current_P, current_I, current_D);
+      yawRatePID.setGains(current_P, current_I, current_D);
+      //rollPID.setGains(current_P, current_I, current_D);
+      //pitchPID.setGains(current_P, current_I, current_D);
       Serial.print("D gain set to: ");
       Serial.println(value);
       break;
